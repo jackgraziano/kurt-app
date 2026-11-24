@@ -64,15 +64,20 @@ Escopo combinado de cada aba:
 - **Erros do domínio** (`CenarioErro`, `SimulacaoErro`, `KeyError`) são traduzidos em HTTP 422 ou 404 num único lugar, `_erros()` em `api.py`. Não espalhe `try/except` nos endpoints.
 - **Gravação de JSON é atômica:** grave em um arquivo temporário e troque com `replace()`.
 - **Testes** usam só a fixture `fixtures/acu3_20260910` e pastas temporárias. Nada de rede nem de dados de `dados/`.
-- **Antes de commitar:** rode `make test` (ruff check, ruff format --check, pytest e tsc) e `npm --prefix frontend run build`.
-- **Teste de verdade no navegador:** o Playwright e o Chromium já vêm instalados no ambiente remoto. Suba o servidor numa porta livre, com `KURT_APP_CADASTRO`, `KURT_APP_CENARIOS` e `KURT_APP_SIMULACOES` apontando para pastas temporárias, e confira que o console fica sem erros.
+- **Antes de commitar:** rode `make test`, que executa ruff check, ruff format --check, pytest e tsc, e `npm --prefix frontend run build`. Na máquina Linux não há `make`: rode `.venv/bin/ruff check kurt_app scripts tests`, `.venv/bin/ruff format --check kurt_app scripts tests`, `.venv/bin/pytest -q` e `npm --prefix frontend run check`.
+- **Teste de verdade no navegador:** no ambiente remoto de agentes, o Playwright e o Chromium já vêm instalados. Na máquina Linux, só há o Google Chrome em `/usr/bin/google-chrome`: instale o `playwright-core` numa pasta temporária e use `executablePath`. Suba o servidor numa porta livre, com `KURT_APP_CADASTRO`, `KURT_APP_CENARIOS` e `KURT_APP_SIMULACOES` apontando para pastas temporárias, e confira que o console fica sem erros.
 
 ## Ambiente e operação
 
 - **Máquina Linux** (usuário Jackson): repositórios em `~/code/kurt` e `~/code/kurt-app`. O caso base do SIN está em `~/code/kurt-app/dados/cadastro/base-20261120`. Os decks ficam no NAS, em `/mnt/nas/personal_folder/Decks`.
 - **Servidor:** `kurt-app servir --cadastro <caso base> --host 0.0.0.0 --porta 8000`, iniciado com `setsid`, com log em `~/code/kurt-app/servir.log`. Depois de um pull, recompile o front e reinicie.
-- **Atualizar o caso base:** rode `kurt config extrair <deck.zip> <saida>` no Kurt, depois o script de conversão para Parquet, depois `kurt-app layout <pasta>` (cerca de 100 s para o SIN) e `kurt-app validar <pasta>`. Os ids de barras, ramos e usinas precisam ser estáveis entre extrações, porque os eventos os referenciam.
-- **Kurt:** não compile em `~/code/kurt` enquanto houver lotes rodando, porque isso troca o binário em uso. Para mexer no Kurt nessas horas, use um worktree com `CARGO_TARGET_DIR` próprio e `nice`.
+- **Atualizar o caso base:**
+  1. No Kurt, rode `kurt config extrair <deck.zip> <saida>`, que grava JSONL.
+  2. Converta para Parquet com `scripts/cadastro_parquet.py`, do repositório do Kurt, usando o Python do kurt-app (`~/code/kurt-app/.venv/bin/python`), porque ele usa `kurt_app.escrita`.
+  3. Rode `kurt-app layout <pasta>`, que leva cerca de 100 s para o SIN.
+  4. Rode `kurt-app validar <pasta>`.
+  Os decks DESSEM ficam no NAS, em `data/raw/ons/dessem/entrada-saida`. Os ids de barras, ramos e usinas precisam ser estáveis entre extrações, porque os eventos os referenciam.
+- **Kurt:** a máquina não tem Rust instalado; compile sempre com `scripts/cargo.sh`, do repositório do Kurt, que usa Docker. Não compile em `~/code/kurt` enquanto houver lotes rodando, porque isso troca o binário em uso. Nessas horas, use um worktree com `CARGO_TARGET_DIR` próprio e `nice`.
 - **Git:** trabalhe na `main` com commits pequenos e mensagens em português, ou numa branch quando outra frente estiver mexendo no mesmo código. Apague as branches e os worktrees depois do merge. Só uma frente por vez edita o kurt-app.
 - **Sem dados pessoais** em requisições a serviços externos.
 
