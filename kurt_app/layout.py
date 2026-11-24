@@ -71,6 +71,35 @@ def _semente(nome: str) -> float:
     return (zlib.crc32(nome.encode()) % 10_000) / 10_000.0
 
 
+def inferir_ufs(subestacoes: dict[str, str | None], arestas: list[tuple[str, str]]) -> dict[str, str | None]:
+    """UF das subestações sem UF (nome fora do padrão ONS) pela maioria dos vizinhos.
+
+    Propaga em rodadas, para alcançar cadeias de barras sem UF (por exemplo,
+    terminais e barras fictícias atrás de um trafo). Quem continuar sem vizinho
+    com UF fica com None e vai para o centro padrão.
+    """
+    uf = dict(subestacoes)
+    viz: dict[str, list[str]] = {}
+    for a, b in arestas:
+        viz.setdefault(a, []).append(b)
+        viz.setdefault(b, []).append(a)
+    pendentes = [s for s, u in uf.items() if u not in CENTRO_UF]
+    for _ in range(10):
+        novos = {}
+        for s in pendentes:
+            votos: dict[str, int] = {}
+            for v in viz.get(s, []):
+                if uf.get(v) in CENTRO_UF:
+                    votos[uf[v]] = votos.get(uf[v], 0) + 1
+            if votos:
+                novos[s] = max(sorted(votos), key=votos.__getitem__)
+        if not novos:
+            break
+        uf.update(novos)
+        pendentes = [s for s in pendentes if s not in novos]
+    return uf
+
+
 def posicoes(
     subestacoes: dict[str, str | None],
     arestas: list[tuple[str, str]],
@@ -81,6 +110,7 @@ def posicoes(
 
     subestacoes: nome -> UF (ou None). arestas: pares de subestações ligadas.
     """
+    subestacoes = inferir_ufs(subestacoes, arestas)
     nomes = sorted(subestacoes)
     n = len(nomes)
     if n == 0:

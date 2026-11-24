@@ -144,3 +144,12 @@ def test_fixture_acu3_valida():
     # os eventos de demonstração só valem no futuro
     assert not any(u["nome"].startswith("[DEMO]") for u in c["usinas"])
     assert any(u["nome"].startswith("[DEMO]") for u in cad.configuracao("2027-07-01")["usinas"])
+
+
+def test_inferir_uf_pelos_vizinhos():
+    from kurt_app.layout import inferir_ufs
+
+    subs = {"A": "RN", "B": "RN", "C": "CE", "X": None, "Y": None, "Z": None}
+    ar = [("A", "X"), ("B", "X"), ("C", "X"), ("X", "Y")]
+    uf = inferir_ufs(subs, ar)
+    assert uf["X"] == "RN" and uf["Y"] == "RN" and uf["Z"] is None
