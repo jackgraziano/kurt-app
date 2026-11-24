@@ -1,4 +1,4 @@
-import type { BarraBusca, CenarioDetalhe, CenarioResumo, Configuracao, Diferenca, Evento, EventoCenario, Ficha, Meta, Validacao } from "./tipos";
+import type { BarraBusca, CenarioDetalhe, CenarioResumo, Configuracao, Diferenca, Evento, EventoCenario, Ficha, Insumo, Meta, Simulacao, Validacao } from "./tipos";
 
 type Params = Record<string, string | number | undefined>;
 
@@ -40,6 +40,17 @@ export const api = {
   validacao: (cenario: string) => get<Validacao>("/api/validacao", { cenario }),
   barras: (cenario: string, data: string, q: string) => get<BarraBusca[]>("/api/barras", { cenario, data, q }),
 
+  // cenários de simulação
+  insumos: () => get<Insumo[]>("/api/insumos"),
+  simulacoes: () => get<Simulacao[]>("/api/simulacoes"),
+  simulacao: (nome: string) => get<Simulacao>(`/api/simulacoes/${nome}`),
+  criarSimulacao: (dados: { nome: string; descricao?: string; inicio?: string; fim?: string; caso_rede?: string }) =>
+    pedir<Simulacao>("POST", "/api/simulacoes", {}, dados),
+  atualizarSimulacao: (nome: string, mudancas: Partial<Pick<Simulacao, "descricao" | "inicio" | "fim" | "insumos">>) =>
+    pedir<Simulacao>("PATCH", `/api/simulacoes/${nome}`, {}, mudancas),
+  apagarSimulacao: (nome: string) => pedir<null>("DELETE", `/api/simulacoes/${nome}`),
+
+  // casos de rede (camadas de eventos sobre o caso base; a API ainda os chama de cenários)
   cenarios: () => get<CenarioResumo[]>("/api/cenarios"),
   cenario: (nome: string) => get<CenarioDetalhe>(`/api/cenarios/${nome}`),
   criarCenario: (nome: string, descricao: string, pai: string | null) =>

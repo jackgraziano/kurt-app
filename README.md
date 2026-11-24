@@ -17,7 +17,17 @@ Roda na máquina Linux, junto com os decks e o binário do Kurt. Não tem login,
 - **Mapa indicativo com linha do tempo:** subestações, ramos e usinas sobre o contorno das UFs, mês a mês, com comparação entre duas datas, ficha de cada elemento e a lista de eventos do mês. No play ou ao arrastar a linha do tempo, o que entrou (verde), mudou (roxo) ou saiu (vermelho) no mês pisca no mapa. As posições são aproximadas de propósito: cada subestação parte do centro da UF e um layout de molas a afasta das vizinhas, sem sair da UF.
 - **Checagens:** versões sobrepostas, domínios, JSON, referências a barras inexistentes, barras com usina ou carga isoladas e ilhas na rede.
 
-## Cenários: o caso base projetado
+## Telas
+
+- **Tela principal** (`#/`): lista os cenários de simulação e cria um novo, escolhendo nome, horizonte (mês de início e de fim) e caso de rede.
+- **Tela do cenário** (`#/c/<nome>/<aba>`): uma aba por insumo da simulação. **Resumo** edita o horizonte e mostra o estado de cada insumo; **Rede elétrica** é o mapa com a linha do tempo, limitada ao horizonte do cenário, e o editor de casos de rede; **Carga**, **Renováveis**, **Hidro** e **Térmicas** ainda são esqueleto.
+
+Cada cenário de simulação é um JSON em `dados/simulacoes/<cadastro>/<nome>.json` (ou `KURT_APP_SIMULACOES`), com o horizonte e a escolha de cada aba (`kurt_app/simulacao.py`). API: `GET /api/insumos`, `GET/POST /api/simulacoes`, `GET/PATCH/DELETE /api/simulacoes/{nome}`. Um caso de rede usado por algum cenário não pode ser apagado.
+
+## Casos de rede: o caso base projetado
+
+> Na API e no código, os casos de rede ainda se chamam `cenarios` (`/api/cenarios`, `kurt_app/cenario.py`); no app, "cenário" é o cenário de simulação.
+
 
 O cadastro extraído do deck mais recente é o **caso base** e nunca é alterado. Um cenário é uma camada de eventos datados aplicada sobre ele (ou sobre outro cenário, o pai), em memória:
 

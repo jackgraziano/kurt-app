@@ -160,7 +160,7 @@ def test_importar_csv():
 
 
 def test_api_cenarios(tmp_path):
-    cli = TestClient(criar_app(FIXTURE, tmp_path / "cen"))
+    cli = TestClient(criar_app(FIXTURE, tmp_path / "cen", tmp_path / "sim"))
     assert [c["nome"] for c in cli.get("/api/cenarios").json()] == ["base"]
     assert cli.post("/api/cenarios", json={"nome": "s1", "descricao": "teste"}).status_code == 201
     assert cli.post("/api/cenarios", json={"nome": "s1"}).status_code == 422

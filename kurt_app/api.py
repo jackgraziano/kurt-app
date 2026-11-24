@@ -9,6 +9,7 @@ from __future__ import annotations
 import os
 from collections.abc import Iterator
 from contextlib import contextmanager
+from dataclasses import asdict
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -23,6 +24,7 @@ from .cenario import BASE, CenarioErro, Cenarios
 from .esquema import ENTIDADES, TABELAS
 from .importar import eventos_de_linhas, eventos_de_usinas
 from .layout import CENTRO_UF, contornos_uf
+from .simulacao import INSUMOS, Simulacoes
 from .validar import relatorio, validar
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -40,7 +42,11 @@ def _erros(nao_existe: str, prefixo: str = "") -> Iterator[None]:
         raise HTTPException(422, f"{prefixo}{e}") from None
 
 
-def criar_app(pasta_cadastro: str | Path | None = None, pasta_cenarios: str | Path | None = None) -> FastAPI:
+def criar_app(
+    pasta_cadastro: str | Path | None = None,
+    pasta_cenarios: str | Path | None = None,
+    pasta_simulacoes: str | Path | None = None,
+) -> FastAPI:
     pasta = pasta_cadastro or os.environ.get("KURT_APP_CADASTRO") or RAIZ / "fixtures" / "acu3_20260910"
     base = Cadastro(pasta)
     cen_dir = (
@@ -49,6 +55,12 @@ def criar_app(pasta_cadastro: str | Path | None = None, pasta_cenarios: str | Pa
         or RAIZ / "dados" / "cenarios" / Path(pasta).resolve().name
     )
     cenarios = Cenarios(base, cen_dir)
+    sim_dir = (
+        pasta_simulacoes
+        or os.environ.get("KURT_APP_SIMULACOES")
+        or RAIZ / "dados" / "simulacoes" / Path(pasta).resolve().name
+    )
+    simulacoes = Simulacoes(sim_dir, cenarios)
     app = FastAPI(title="kurt-app", version=__version__)
     app.state.cenarios = cenarios
 
@@ -141,6 +153,9 @@ def criar_app(pasta_cadastro: str | Path | None = None, pasta_cenarios: str | Pa
 
     @app.delete("/api/cenarios/{nome}", status_code=204)
     def apagar(nome: str):
+        usam = simulacoes.usam_caso(nome)
+        if usam:
+            raise HTTPException(422, f"o caso de rede {nome} é usado pelos cenários {', '.join(usam)}")
         with _erros(f"cenário {nome} não existe"):
             cenarios.apagar(nome)
 
@@ -162,6 +177,41 @@ def criar_app(pasta_cadastro: str | Path | None = None, pasta_cenarios: str | Pa
         with _erros(f"cenário {nome} não existe"):
             evs = eventos_de_linhas(texto) if tipo == "linhas" else eventos_de_usinas(texto)
             return cenarios.adicionar_eventos(nome, evs)
+
+    # -- cenários de simulação (tela principal e abas de insumos) ------------
+    @app.get("/api/insumos")
+    def insumos():
+        return [asdict(i) for i in INSUMOS]
+
+    @app.get("/api/simulacoes")
+    def listar_simulacoes():
+        return simulacoes.listar()
+
+    @app.post("/api/simulacoes", status_code=201)
+    def criar_simulacao(dados: dict[str, Any] = Body(...)):
+        with _erros(""):
+            return simulacoes.criar(
+                dados.get("nome", ""),
+                dados.get("descricao", ""),
+                dados.get("inicio"),
+                dados.get("fim"),
+                dados.get("caso_rede") or BASE,
+            )
+
+    @app.get("/api/simulacoes/{nome}")
+    def ler_simulacao(nome: str):
+        with _erros(f"cenário {nome} não existe"):
+            return simulacoes.ler(nome)
+
+    @app.patch("/api/simulacoes/{nome}")
+    def atualizar_simulacao(nome: str, mudancas: dict[str, Any] = Body(...)):
+        with _erros(f"cenário {nome} não existe"):
+            return simulacoes.atualizar(nome, mudancas)
+
+    @app.delete("/api/simulacoes/{nome}", status_code=204)
+    def apagar_simulacao(nome: str):
+        with _erros(f"cenário {nome} não existe"):
+            simulacoes.apagar(nome)
 
     @app.get("/api/ufs")
     def ufs():

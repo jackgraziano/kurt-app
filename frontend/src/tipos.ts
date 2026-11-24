@@ -156,3 +156,21 @@ export interface CenarioDetalhe {
   herdados: EventoCenario[];
   cadeia: string[];
 }
+
+// cenário de simulação (tela principal e abas de insumos)
+export interface Insumo {
+  id: string;
+  rotulo: string;
+  descricao: string;
+  disponivel: boolean;
+}
+
+export interface Simulacao {
+  nome: string;
+  descricao: string;
+  inicio: string;
+  fim: string;
+  criado_em: string;
+  atualizado_em: string;
+  insumos: Record<string, Record<string, unknown>> & { rede?: { caso?: string } };
+}
