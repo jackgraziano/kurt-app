@@ -132,8 +132,15 @@ $("#legenda").innerHTML = `
   <div><span class="l" style="background:${COR_ESTADO.novo}"></span>entrou <span class="l" style="background:${COR_ESTADO.saiu}"></span>saiu <span class="l" style="background:${COR_ESTADO.mudou}"></span>mudou <span class="l tr"></span>previsto</div>`;
 
 // ---------- carregamento do mapa ----------
+let controlador: AbortController | null = null;
+
 async function atualizar(): Promise<void> {
   const meu = ++pedido;
+  // só a consulta mais recente interessa: cancela as que ainda estão em voo
+  controlador?.abort();
+  controlador = new AbortController();
+  const sinal = controlador.signal;
+  $("#resumo").classList.add("carregando");
   const mes = mesAtual();
   const data = fimDoMes(mes);
   const kvs = $<HTMLSelectElement>("#kv").value;
@@ -146,10 +153,10 @@ async function atualizar(): Promise<void> {
   const mesCmp = $<HTMLSelectElement>("#cmp-mes").value;
   try {
     const [cfg, evs, cmp] = await Promise.all([
-      api.configuracao(cenario, data, kv, sub),
-      api.eventos(cenario, `${mes}-01`, data),
+      api.configuracao(cenario, data, kv, sub, sinal),
+      api.eventos(cenario, `${mes}-01`, data, sinal),
       comparar && mesCmp && mesCmp !== mes
-        ? Promise.all([api.configuracao(cenario, fimDoMes(mesCmp), kv, sub), api.diferenca(cenario, fimDoMes(mesCmp), data)])
+        ? Promise.all([api.configuracao(cenario, fimDoMes(mesCmp), kv, sub, sinal), api.diferenca(cenario, fimDoMes(mesCmp), data, sinal)])
         : Promise.resolve(null),
     ]);
     if (meu !== pedido) return; // chegou uma resposta mais nova
@@ -172,7 +179,10 @@ async function atualizar(): Promise<void> {
     mapa.carregar(cena, pulsar);
     mostrarEventos(evs, mes);
     mostrarResumo(cfg, cmp ? cmp[1] : null, mesCmp);
+    $("#resumo").classList.remove("carregando");
   } catch (err) {
+    if (sinal.aborted) return; // substituída por uma consulta mais nova
+    $("#resumo").classList.remove("carregando");
     aviso(String(err), true);
   }
 }
@@ -620,7 +630,18 @@ $("#play").addEventListener("click", () => {
   }, 900);
 });
 
-for (const id of ["#mes", "#kv", "#sub", "#mmgd", "#cmp-on", "#cmp-mes"]) $(id).addEventListener("input", () => void atualizar());
+for (const id of ["#kv", "#sub", "#mmgd", "#cmp-on", "#cmp-mes"]) $(id).addEventListener("input", () => void atualizar());
+// ao arrastar a linha do tempo, o rótulo acompanha na hora e a consulta espera o controle parar
+let espera: number | undefined;
+$("#mes").addEventListener("input", () => {
+  const mes = mesAtual();
+  const data = fimDoMes(mes);
+  const futuro = meta.data_base && data > meta.data_base;
+  $("#mes-rotulo").innerHTML = `<b>${rotuloMes(mes)}</b><br><small>${futuro ? "projeção" : "situação"} em ${fmtData(data)}</small>`;
+  $("#resumo").classList.add("carregando");
+  clearTimeout(espera);
+  espera = window.setTimeout(() => void atualizar(), 200);
+});
 $("#mes").addEventListener("change", () => {
   if (editavel()) mostrarCenario(); // atualiza as datas padrão dos formulários
 });

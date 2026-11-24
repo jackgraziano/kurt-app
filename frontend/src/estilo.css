@@ -88,3 +88,5 @@ button.x:hover { color: #c4372d; }
 form.acao-ficha { border-top: 1px solid #eef1f4; padding-top: 6px; }
 table.kv.conf-previsto caption, table.kv.conf-contratado caption, table.kv.conf-especulativo caption { color: #2e6d3f; }
 .dica-edicao { margin-top: 12px; }
+#resumo.carregando { opacity: 0.45; }
+#resumo.carregando::after { content: "carregando…"; display: block; font-style: italic; color: #667; }
