@@ -1,0 +1,71 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: #1d2433; background: #f6f7f9; }
+#app { display: flex; flex-direction: column; height: 100vh; }
+
+header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 14px; background: #fff; border-bottom: 1px solid #e3e6eb; }
+.marca { font-weight: 700; font-size: 15px; }
+.marca span { font-weight: 400; color: #667; }
+.controles { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.controles label { display: flex; gap: 6px; align-items: center; color: #445; }
+select, button { font: inherit; padding: 3px 6px; border: 1px solid #cfd4dc; border-radius: 6px; background: #fff; cursor: pointer; }
+button:hover { background: #f0f2f5; }
+
+.linha-tempo { display: flex; align-items: center; gap: 12px; padding: 8px 14px 6px; background: #fff; border-bottom: 1px solid #e3e6eb; }
+#play { width: 34px; }
+.trilho { position: relative; flex: 1; height: 42px; }
+#marcas { position: absolute; inset: 0 8px 18px 8px; pointer-events: none; }
+.marca-mes { position: absolute; bottom: 0; width: 0; }
+.marca-mes i { position: absolute; bottom: 0; left: -3px; width: 6px; border-radius: 2px; background: #2e9d4b; }
+.marca-mes i.previsto { background: transparent; border: 1.5px dashed #2e9d4b; }
+.marca-mes .ano { position: absolute; top: 26px; left: -14px; font-size: 10px; color: #889; }
+#mes { position: absolute; left: 0; right: 0; bottom: 6px; width: 100%; margin: 0; }
+#mes-rotulo { min-width: 120px; text-align: right; }
+#mes-rotulo b { font-size: 16px; }
+#mes-rotulo small { color: #778; }
+
+main { flex: 1; display: flex; min-height: 0; }
+.mapa-wrap { position: relative; flex: 1; min-width: 0; }
+#mapa { width: 100%; height: 100%; display: block; background: #fbfcfd; cursor: grab; }
+#mapa:active { cursor: grabbing; }
+#dica { position: fixed; z-index: 10; max-width: 320px; padding: 6px 8px; background: #1d2433; color: #fff; border-radius: 6px; pointer-events: none; font-size: 12px; }
+.legenda, .resumo { position: absolute; background: rgba(255,255,255,.92); border: 1px solid #e3e6eb; border-radius: 8px; padding: 6px 10px; font-size: 12px; color: #445; }
+.legenda { left: 10px; bottom: 10px; }
+.legenda div { margin: 2px 0; }
+.resumo { left: 10px; top: 10px; }
+.q { display: inline-block; width: 9px; height: 9px; border: 2px solid; background: #fff; margin: 0 3px 0 8px; vertical-align: -1px; }
+.q:first-child { margin-left: 0; }
+.b { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin: 0 3px 0 8px; vertical-align: -1px; }
+.b:first-child { margin-left: 0; }
+.l { display: inline-block; width: 14px; height: 3px; margin: 0 3px 0 8px; vertical-align: 2px; }
+.l:first-child { margin-left: 0; }
+.l.tr { background: repeating-linear-gradient(90deg, #555 0 4px, transparent 4px 7px); }
+
+aside { width: 360px; display: flex; flex-direction: column; background: #fff; border-left: 1px solid #e3e6eb; min-height: 0; }
+aside nav { display: flex; border-bottom: 1px solid #e3e6eb; }
+aside nav button { flex: 1; border: 0; border-radius: 0; padding: 8px; background: #fff; color: #667; }
+aside nav button.ativa { color: #1d2433; font-weight: 600; box-shadow: inset 0 -2px 0 #1f3b57; }
+.aba { flex: 1; overflow: auto; padding: 10px 14px; }
+.aba h3 { margin: 4px 0 8px; font-size: 14px; }
+.aba h4 { margin: 12px 0 4px; font-size: 12px; text-transform: uppercase; color: #667; letter-spacing: .03em; }
+.vazio, .sub { color: #778; }
+.erro { color: #c4372d; }
+a[data-ent] { color: #1f5fa8; cursor: pointer; text-decoration: none; }
+a[data-ent]:hover { text-decoration: underline; }
+.rel a { margin-right: 6px; }
+
+.evento { border: 1px solid #e3e6eb; border-left: 3px solid #2e9d4b; border-radius: 6px; padding: 6px 8px; margin: 6px 0; }
+.evento.conf-previsto, .evento.conf-especulativo, .evento.conf-contratado { border-left-style: dashed; }
+.evento .data { font-weight: 600; }
+.evento .acao { display: inline-block; padding: 0 5px; border-radius: 4px; background: #eef1f4; font-size: 11px; }
+.evento .campos, .evento .nota { margin-top: 3px; color: #445; }
+.evento .fonte { margin-top: 3px; font-size: 11px; color: #889; }
+
+table.kv { width: 100%; border-collapse: collapse; margin: 6px 0 10px; }
+table.kv caption { text-align: left; font-weight: 600; padding: 4px 0; }
+table.kv caption small { font-weight: 400; color: #889; margin-left: 6px; }
+table.kv th { text-align: left; font-weight: 400; color: #667; padding: 2px 8px 2px 0; width: 40%; vertical-align: top; }
+table.kv td { padding: 2px 0; word-break: break-word; }
+table.kv tr + tr { border-top: 1px solid #f0f2f5; }
+
+.prob { border-radius: 6px; padding: 6px 8px; margin: 6px 0; background: #fff6e5; }
+.prob.erro { background: #fdeceb; color: #1d2433; }

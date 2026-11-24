@@ -1,0 +1,11 @@
+{
+  "nome": "Recorte de Açu III, deck DESSEM de 10/09/2026",
+  "tipo": "fixture",
+  "origem": "acu3_20260910_dados.json",
+  "avisos": [
+    "cap_mw das usinas aproximada pelo máximo da geração de referência do dia",
+    "carga_media_mw é a média das 48 meias-horas, não a carga do caso base",
+    "x_pct ausente no recorte",
+    "eventos com fonte 'demo' são hipotéticos"
+  ]
+}
