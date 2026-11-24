@@ -607,27 +607,29 @@ function montarLinhaTempo(manterMes?: string): void {
   cmpSel.value = meses.includes(anterior) ? anterior : (meta.data_base ?? meses[0]).slice(0, 7);
 }
 
-let animando: number | null = null;
-$("#play").addEventListener("click", () => {
+// play: avança um mês, espera o mapa daquele mês chegar e deixa o pulso aparecer antes do próximo
+let animando = false;
+let volta = 0; // impede dois laços se o play for clicado de novo durante uma espera
+const pausa = (ms: number) => new Promise((r) => setTimeout(r, ms));
+$("#play").addEventListener("click", async () => {
   const slider = $<HTMLInputElement>("#mes");
-  if (animando !== null) {
-    clearInterval(animando);
-    animando = null;
-    $("#play").textContent = "▶";
+  if (animando) {
+    animando = false;
     return;
   }
+  animando = true;
+  const minha = ++volta;
   $("#play").textContent = "❚❚";
-  animando = window.setInterval(() => {
-    const v = Number(slider.value) + 1;
-    if (v > Number(slider.max)) {
-      clearInterval(animando!);
-      animando = null;
-      $("#play").textContent = "▶";
-      return;
-    }
-    slider.value = String(v);
-    void atualizar();
-  }, 900);
+  if (Number(slider.value) >= Number(slider.max)) slider.value = slider.min;
+  while (animando && minha === volta && Number(slider.value) < Number(slider.max)) {
+    const t0 = performance.now();
+    slider.value = String(Number(slider.value) + 1);
+    await atualizar();
+    await pausa(Math.max(0, 1100 - (performance.now() - t0)));
+  }
+  if (minha !== volta) return;
+  animando = false;
+  $("#play").textContent = "▶";
 });
 
 for (const id of ["#kv", "#sub", "#mmgd", "#cmp-on", "#cmp-mes"]) $(id).addEventListener("input", () => void atualizar());
