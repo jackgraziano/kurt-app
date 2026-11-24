@@ -51,7 +51,7 @@ async function telaInicio(): Promise<void> {
   el.innerHTML = `
     <div class="inicio">
       <h2>Cenários</h2>
-      <p class="sub">Um cenário reúne o horizonte e os insumos de uma simulação do Kurt: rede elétrica, carga, renováveis, hidro e térmicas.
+      <p class="sub">Um cenário reúne o horizonte e os insumos de uma simulação do Kurt: rede elétrica, carga, renováveis, hidro, valor da água, térmicas e a configuração da execução.
       O caso base é o deck de ${meta.data_base ? fmtData(meta.data_base) : "?"}.</p>
       <div class="grade-inicio">
         <form id="f-simulacao" class="cartao">

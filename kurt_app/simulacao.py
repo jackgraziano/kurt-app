@@ -1,7 +1,8 @@
 """Cenários de simulação: o que uma rodada do Kurt vai usar, aba por aba.
 
 Um cenário de simulação tem um horizonte (início e fim) e um conjunto de
-insumos, um por aba do app: rede elétrica, carga, renováveis, hidro, térmicas.
+insumos, um por aba do app: rede elétrica, carga, renováveis, hidro, valor da
+água, térmicas e execução.
 Cada insumo guarda só a escolha feita para ele. Por enquanto, só a rede é
 configurável, apontando para um caso de rede (o caso base ou uma camada de
 eventos sobre ele, ver ``cenario.py``). Os outros insumos são esqueletos, e
@@ -46,18 +47,41 @@ INSUMOS: tuple[Insumo, ...] = (
     Insumo(
         "rede",
         "Rede elétrica",
-        "Barras, linhas, transformadores e usinas, com a expansão datada (caso de rede).",
+        "Barras, linhas, transformadores e usinas, com a expansão datada (caso de rede), "
+        "e as restrições elétricas: RESP, LPP, RE e limites de intercâmbio.",
         True,
     ),
     Insumo("carga", "Carga", "Demanda por submercado e por barra, mês a mês e na curva horária.", False),
     Insumo(
         "renovaveis",
         "Renováveis",
-        "Geração eólica e solar prevista (séries e cenários), MMGD e limites de corte.",
+        "Geração eólica e solar prevista (séries e cenários), usinas não despacháveis (flag 0), MMGD e limites de corte.",
         False,
     ),
-    Insumo("hidro", "Hidro", "Afluências, níveis iniciais dos reservatórios, restrições hidráulicas e FPHA.", False),
+    Insumo(
+        "hidro",
+        "Hidro",
+        "Afluências, níveis iniciais dos reservatórios, FPHA e restrições hidráulicas "
+        "(operuh, defluências mínimas, máximas e sazonais).",
+        False,
+    ),
+    Insumo(
+        "valor_agua",
+        "Valor da água",
+        "Função de custo futuro (cortes do DECOMP) que valora o armazenamento no fim de cada dia: "
+        "de rodadas de planejamento do horizonte, do DECOMP oficial ou repetindo a do deck base. "
+        "Sem ela o Kurt não roda.",
+        False,
+    ),
     Insumo("termicas", "Térmicas", "Disponibilidade, inflexibilidade, CVU e manutenções das térmicas.", False),
+    Insumo(
+        "execucao",
+        "Execução",
+        "Como rodar: dias (todos ou típicos), discretização, quantos cenários combinar entre carga, "
+        "renováveis e afluência, saídas (P10, P50, P90 por mês, submercado, tipo de corte e usina) "
+        "e opções do PL (rede, UC). Daqui a rodada será disparada.",
+        False,
+    ),
 )
 IDS_INSUMOS = tuple(i.id for i in INSUMOS)
 

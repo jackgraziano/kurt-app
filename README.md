@@ -20,7 +20,7 @@ Roda na máquina Linux, junto com os decks e o binário do Kurt. Não tem login,
 ## Telas
 
 - **Tela principal** (`#/`): lista os cenários de simulação e cria um novo, escolhendo nome, horizonte (mês de início e de fim) e caso de rede.
-- **Tela do cenário** (`#/c/<nome>/<aba>`): uma aba por insumo da simulação. **Resumo** edita o horizonte e mostra o estado de cada insumo; **Rede elétrica** é o mapa com a linha do tempo, limitada ao horizonte do cenário, e o editor de casos de rede; **Carga**, **Renováveis**, **Hidro** e **Térmicas** ainda são esqueleto.
+- **Tela do cenário** (`#/c/<nome>/<aba>`): uma aba por insumo da simulação. **Resumo** edita o horizonte e mostra o estado de cada insumo; **Rede elétrica** é o mapa com a linha do tempo, limitada ao horizonte do cenário, e o editor de casos de rede; **Carga**, **Renováveis**, **Hidro**, **Valor da água** (FCF), **Térmicas** e **Execução** (dias, discretização, cenários, saídas e opções do PL) ainda são esqueleto.
 
 Cada cenário de simulação é um JSON em `dados/simulacoes/<cadastro>/<nome>.json` (ou `KURT_APP_SIMULACOES`), com o horizonte e a escolha de cada aba (`kurt_app/simulacao.py`). API: `GET /api/insumos`, `GET/POST /api/simulacoes`, `GET/PATCH/DELETE /api/simulacoes/{nome}`. Um caso de rede usado por algum cenário não pode ser apagado.
 
