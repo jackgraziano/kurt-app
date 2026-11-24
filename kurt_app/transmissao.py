@@ -28,7 +28,14 @@ from collections import defaultdict
 from datetime import date
 from typing import Any
 
-from .expansao import Casamento, Subestacao, _proximo_mes, casar_nome, escolher_barra, indice_subestacoes, tokens
+from .expansao import (
+    Casamento,
+    casar_nome,
+    escolher_barra,
+    indice_subestacoes,
+    proximo_mes,
+    tokens,
+)
 
 SITUACOES = {"Em andamento", "Planejado"}
 KV_MIN = 230.0
@@ -81,7 +88,7 @@ def montar(
         if a and b:
             ramos_entre[frozenset((a, b))].append(r)
     lt_por_mdl = {m["IdeMdl"]: m for m in modulos_lt}
-    primeiro = _proximo_mes(data_base)
+    primeiro = proximo_mes(data_base)
 
     vistos: set[str] = set()
     sel = []
@@ -111,16 +118,23 @@ def montar(
     def pend(o: dict, motivo: str, cands: list | None = None) -> None:
         pendencias.append(
             {
-                "IdeMdl": o["IdeMdl"], "modulo": o.get("NomMdl"), "obra": (o.get("DscObr") or "")[:300],
-                "data": (data_obra(o) or "").__str__(), "motivo": motivo, "candidatos": cands or [],
+                "IdeMdl": o["IdeMdl"],
+                "modulo": o.get("NomMdl"),
+                "obra": (o.get("DscObr") or "")[:300],
+                "data": (data_obra(o) or "").__str__(),
+                "motivo": motivo,
+                "candidatos": cands or [],
             }
         )
 
     def ev(o: dict, d: date, acao: str, entidade: str, **kw: Any) -> dict:
         e = {
             "evento_id": f"siget-{o['IdeMdl']}-{acao}-{entidade}-{len(eventos)}",
-            "data": d.isoformat(), "acao": acao, "entidade": entidade,
-            "fonte": rotulo_fonte, "confianca": "contratado",
+            "data": d.isoformat(),
+            "acao": acao,
+            "entidade": entidade,
+            "fonte": rotulo_fonte,
+            "confianca": "contratado",
             "nota": f"SIGET módulo {o['IdeMdl']} ({o.get('IdeOnsMdl')}): {(o.get('DscObr') or '')[:240]}",
         }
         e.update(kw)
@@ -135,11 +149,26 @@ def montar(
         bid = f"BN-{sub}-{uf}{int(kv)}"
         novas_barras[k] = bid
         barras_criadas[bid] = {"area": vizinha.get("area"), "submercado": vizinha.get("submercado"), "kv": kv}
-        ev(o, d, "entra", "barras", entidade_id=bid, registro={
-            "barra_id": bid, "num_pwf": None, "nome": f"{nome} {int(kv)} kV (nova)", "kv": kv, "area": vizinha.get("area"),
-            "submercado": vizinha.get("submercado"), "subestacao": f"{sub} (nova)", "uf": uf,
-            "pos_x": None, "pos_y": None, "elevatoria": False,
-        })
+        ev(
+            o,
+            d,
+            "entra",
+            "barras",
+            entidade_id=bid,
+            registro={
+                "barra_id": bid,
+                "num_pwf": None,
+                "nome": f"{nome} {int(kv)} kV (nova)",
+                "kv": kv,
+                "area": vizinha.get("area"),
+                "submercado": vizinha.get("submercado"),
+                "subestacao": f"{sub} (nova)",
+                "uf": uf,
+                "pos_x": None,
+                "pos_y": None,
+                "elevatoria": False,
+            },
+        )
         return bid
 
     def _ref(bid: str) -> dict:
@@ -154,7 +183,11 @@ def montar(
             return None
         k = frozenset((sub_de[a], sub_de[b]))
         kv = min(bar[a]["kv"], bar[b]["kv"])
-        rs = [r for r in ramos_entre.get(k, []) if r["tipo"] in ("linha", "csc") and min(bar[r["de"]]["kv"], bar[r["para"]]["kv"]) == kv]
+        rs = [
+            r
+            for r in ramos_entre.get(k, [])
+            if r["tipo"] in ("linha", "csc") and min(bar[r["de"]]["kv"], bar[r["para"]]["kv"]) == kv
+        ]
         if circ is not None:
             mesmo = [r for r in rs if r.get("circuito") == circ]
             if mesmo:
@@ -168,59 +201,95 @@ def montar(
     restantes: list[dict] = []
     lts.sort(key=lambda o: (data_obra(o) or date.max, o["IdeMdl"]))
     for passada in range(2):
-      for o in (lts if passada == 0 else restantes):
-          m = lt_por_mdl.get(o["IdeMdl"])
-          kv = _num(m.get("NumTensaoBaseLinhaTransm")) if m else None
-          if kv is None:
-              km = RE_KV.search(o.get("NomMdl") or "")
-              kv = _num(km.group(1)) if km else None
-          if kv is None or kv < KV_MIN:
-              continue
-          d = data_obra(o)
-          if m is None or d is None:
-              pend(o, "sem módulo de linha ou sem data")
-              continue
-          if d > horizonte:
-              continue
-          s = RE_SEC.search(o.get("DscObr") or "")
-          if s:
-              chave = (s.group(2).strip().upper(), s.group(3).strip().upper(), int(s.group(4)), kv, m.get("SigUFSubestacaoOrigem"))
-              grupos[chave].append((o, m))
-              continue
-          a, ca = ponta(m["NomSubestacaoOrigem"], m["SigUFSubestacaoOrigem"], kv)
-          b, cb = ponta(m["NomSubestacaoDestino"], m["SigUFSubestacaoDestino"], kv)
-          # subestação nova: ponta sem nada parecido no deck (score < NOVA_MAX), com a outra casada ou já criada
-          a = a or novas_barras.get((m["SigUFSubestacaoOrigem"], m["NomSubestacaoOrigem"].upper(), kv))
-          b = b or novas_barras.get((m["SigUFSubestacaoDestino"], m["NomSubestacaoDestino"].upper(), kv))
-          if passada == 0 and not a and not b:
-              restantes.append(o)
-              continue
-          if not a and b and ca.score < NOVA_MAX:
-              a = barra_nova(m["NomSubestacaoOrigem"], m["SigUFSubestacaoOrigem"], kv, _ref(b), o, d)
-          elif not b and a and cb.score < NOVA_MAX:
-              b = barra_nova(m["NomSubestacaoDestino"], m["SigUFSubestacaoDestino"], kv, _ref(a), o, d)
-          if not a or not b or a == b:
-              pend(o, f"ponta sem casamento ({m['NomSubestacaoOrigem']}: {ca.motivo or 'ok'}; {m['NomSubestacaoDestino']}: {cb.motivo or 'ok'})", ca.candidatos + cb.candidatos)
-              continue
-          circ = int(_num(m.get("NumCcuLinTms")) or 1)
-          existente = ramo_entre(a, b, None)
-          n_exist = len([r for r in ramos_entre.get(frozenset((sub_de[a], sub_de[b])), []) if r["tipo"] == "linha"]) if existente else 0
-          if existente is not None and n_exist >= circ:
-              no_deck.append({"IdeMdl": o["IdeMdl"], "modulo": o.get("NomMdl"), "ramo_deck": existente["ramo_id"], "motivo": f"o deck já tem {n_exist} circuito(s) entre as subestações; a obra é o C{circ}"})
-              continue
-          n_lt += 1
-          mva = RE_MVA.search(o.get("DscObr") or "")
-          de, para = sorted((a, b))
-          ev(o, d, "entra", "ramos", entidade_id=f"R{de[1:]}-{para[1:]}-S{o['IdeMdl']}", registro={
-              "ramo_id": f"R{de[1:]}-{para[1:]}-S{o['IdeMdl']}", "de": de, "para": para, "circuito": circ, "tipo": "linha",
-              "nome": m.get("NomLinTms") or o.get("NomMdl"), "x_pct": existente["x_pct"] if existente else None,
-              "cap_normal_mva": _num(mva.group(1)) if mva else None, "cap_emerg_mva": _num(mva.group(2)) if mva else None,
-              "estado_base": "ligado",
-          })
-          if existente is None:
-              eventos[-1]["nota"] += " | x_pct desconhecido (LT nova sem paralela no deck)" + (" | subestação nova criada pelo SIGET" if a in barras_criadas or b in barras_criadas else "")
-          else:
-              eventos[-1]["nota"] += f" | x_pct copiado do circuito paralelo {existente['ramo_id']}"
+        for o in lts if passada == 0 else restantes:
+            m = lt_por_mdl.get(o["IdeMdl"])
+            kv = _num(m.get("NumTensaoBaseLinhaTransm")) if m else None
+            if kv is None:
+                km = RE_KV.search(o.get("NomMdl") or "")
+                kv = _num(km.group(1)) if km else None
+            if kv is None or kv < KV_MIN:
+                continue
+            d = data_obra(o)
+            if m is None or d is None:
+                pend(o, "sem módulo de linha ou sem data")
+                continue
+            if d > horizonte:
+                continue
+            s = RE_SEC.search(o.get("DscObr") or "")
+            if s:
+                chave = (
+                    s.group(2).strip().upper(),
+                    s.group(3).strip().upper(),
+                    int(s.group(4)),
+                    kv,
+                    m.get("SigUFSubestacaoOrigem"),
+                )
+                grupos[chave].append((o, m))
+                continue
+            a, ca = ponta(m["NomSubestacaoOrigem"], m["SigUFSubestacaoOrigem"], kv)
+            b, cb = ponta(m["NomSubestacaoDestino"], m["SigUFSubestacaoDestino"], kv)
+            # subestação nova: ponta sem nada parecido no deck (score < NOVA_MAX), com a outra casada ou já criada
+            a = a or novas_barras.get((m["SigUFSubestacaoOrigem"], m["NomSubestacaoOrigem"].upper(), kv))
+            b = b or novas_barras.get((m["SigUFSubestacaoDestino"], m["NomSubestacaoDestino"].upper(), kv))
+            if passada == 0 and not a and not b:
+                restantes.append(o)
+                continue
+            if not a and b and ca.score < NOVA_MAX:
+                a = barra_nova(m["NomSubestacaoOrigem"], m["SigUFSubestacaoOrigem"], kv, _ref(b), o, d)
+            elif not b and a and cb.score < NOVA_MAX:
+                b = barra_nova(m["NomSubestacaoDestino"], m["SigUFSubestacaoDestino"], kv, _ref(a), o, d)
+            if not a or not b or a == b:
+                pend(
+                    o,
+                    f"ponta sem casamento ({m['NomSubestacaoOrigem']}: {ca.motivo or 'ok'}; {m['NomSubestacaoDestino']}: {cb.motivo or 'ok'})",
+                    ca.candidatos + cb.candidatos,
+                )
+                continue
+            circ = int(_num(m.get("NumCcuLinTms")) or 1)
+            existente = ramo_entre(a, b, None)
+            n_exist = (
+                len([r for r in ramos_entre.get(frozenset((sub_de[a], sub_de[b])), []) if r["tipo"] == "linha"])
+                if existente
+                else 0
+            )
+            if existente is not None and n_exist >= circ:
+                no_deck.append(
+                    {
+                        "IdeMdl": o["IdeMdl"],
+                        "modulo": o.get("NomMdl"),
+                        "ramo_deck": existente["ramo_id"],
+                        "motivo": f"o deck já tem {n_exist} circuito(s) entre as subestações; a obra é o C{circ}",
+                    }
+                )
+                continue
+            n_lt += 1
+            mva = RE_MVA.search(o.get("DscObr") or "")
+            de, para = sorted((a, b))
+            ev(
+                o,
+                d,
+                "entra",
+                "ramos",
+                entidade_id=f"R{de[1:]}-{para[1:]}-S{o['IdeMdl']}",
+                registro={
+                    "ramo_id": f"R{de[1:]}-{para[1:]}-S{o['IdeMdl']}",
+                    "de": de,
+                    "para": para,
+                    "circuito": circ,
+                    "tipo": "linha",
+                    "nome": m.get("NomLinTms") or o.get("NomMdl"),
+                    "x_pct": existente["x_pct"] if existente else None,
+                    "cap_normal_mva": _num(mva.group(1)) if mva else None,
+                    "cap_emerg_mva": _num(mva.group(2)) if mva else None,
+                    "estado_base": "ligado",
+                },
+            )
+            if existente is None:
+                eventos[-1]["nota"] += " | x_pct desconhecido (LT nova sem paralela no deck)" + (
+                    " | subestação nova criada pelo SIGET" if a in barras_criadas or b in barras_criadas else ""
+                )
+            else:
+                eventos[-1]["nota"] += f" | x_pct copiado do circuito paralelo {existente['ramo_id']}"
 
     # ---- seccionamentos
     n_sec = 0
@@ -232,7 +301,11 @@ def montar(
         antiga = ramo_entre(a, b, circ) if a and b and a != b else None
         if antiga is None:
             for o, _ in itens:
-                pend(o, f"seccionamento: LT antiga {na} / {nb} C{circ} não encontrada no deck", ca.candidatos + cb.candidatos)
+                pend(
+                    o,
+                    f"seccionamento: LT antiga {na} / {nb} C{circ} não encontrada no deck",
+                    ca.candidatos + cb.candidatos,
+                )
             continue
         if len(itens) != 2:
             for o, _ in itens:
@@ -243,7 +316,10 @@ def montar(
         trechos = []
         meio_nome = None
         for o, m in itens:
-            pts = [(m["NomSubestacaoOrigem"], m["SigUFSubestacaoOrigem"]), (m["NomSubestacaoDestino"], m["SigUFSubestacaoDestino"])]
+            pts = [
+                (m["NomSubestacaoOrigem"], m["SigUFSubestacaoOrigem"]),
+                (m["NomSubestacaoDestino"], m["SigUFSubestacaoDestino"]),
+            ]
             cas = [(p, ponta(p[0], p[1], kv)[0]) for p in pts]
             fixa = [x for x in cas if x[1] and sub_de[x[1]] in (sa, sb)]
             outra = [x for x in cas if not (x[1] and sub_de[x[1]] in (sa, sb))]
@@ -262,17 +338,33 @@ def montar(
         ev(o0, d, "sai", "ramos", entidade_id=antiga["ramo_id"])
         kms = [_num(m.get("NumEtnLinTms")) for _, m, _, _ in trechos]
         tot = sum(k for k in kms if k) if all(kms) else None
-        for (o, m, fixa, _), km in zip(trechos, kms):
+        for (o, m, fixa, _), km in zip(trechos, kms, strict=True):
             frac = (km / tot) if tot else 0.5
             x = antiga["x_pct"] * frac if antiga.get("x_pct") is not None else None
             de, para = sorted((fixa, meio))
             rid = f"R{de.lstrip('B')}-{para.lstrip('B')}-S{o['IdeMdl']}"
-            ev(o, d, "entra", "ramos", entidade_id=rid, registro={
-                "ramo_id": rid, "de": de, "para": para, "circuito": int(_num(m.get("NumCcuLinTms")) or 1), "tipo": "linha",
-                "nome": m.get("NomLinTms") or o.get("NomMdl"), "x_pct": round(x, 4) if x is not None else None,
-                "cap_normal_mva": antiga.get("cap_normal_mva"), "cap_emerg_mva": antiga.get("cap_emerg_mva"), "estado_base": "ligado",
-            })
-            eventos[-1]["nota"] += f" | seccionamento de {antiga['ramo_id']}; x_pct = {frac:.2f} do x da LT antiga" + (" (pela extensão)" if tot else " (metade, sem extensão)")
+            ev(
+                o,
+                d,
+                "entra",
+                "ramos",
+                entidade_id=rid,
+                registro={
+                    "ramo_id": rid,
+                    "de": de,
+                    "para": para,
+                    "circuito": int(_num(m.get("NumCcuLinTms")) or 1),
+                    "tipo": "linha",
+                    "nome": m.get("NomLinTms") or o.get("NomMdl"),
+                    "x_pct": round(x, 4) if x is not None else None,
+                    "cap_normal_mva": antiga.get("cap_normal_mva"),
+                    "cap_emerg_mva": antiga.get("cap_emerg_mva"),
+                    "estado_base": "ligado",
+                },
+            )
+            eventos[-1]["nota"] += f" | seccionamento de {antiga['ramo_id']}; x_pct = {frac:.2f} do x da LT antiga" + (
+                " (pela extensão)" if tot else " (metade, sem extensão)"
+            )
 
     # ---- transformações
     n_tr = 0
@@ -304,21 +396,50 @@ def montar(
             pend(o, f"transformação: {sub.nome} não tem barra de {baixa:g} kV no deck")
             continue
         hb = hb["barra_id"]
-        paralelos = [r for r in ramos_entre.get(frozenset((sub_de[ha],)), []) if r["tipo"] == "trafo" and {bar[r["de"]]["kv"], bar[r["para"]]["kv"]} == {alta, baixa}]
+        paralelos = [
+            r
+            for r in ramos_entre.get(frozenset((sub_de[ha],)), [])
+            if r["tipo"] == "trafo" and {bar[r["de"]]["kv"], bar[r["para"]]["kv"]} == {alta, baixa}
+        ]
         n_idx = int(re.sub(r"\D", "", rot) or 0)
         if paralelos and len(paralelos) >= n_idx > 0:
-            no_deck.append({"IdeMdl": o["IdeMdl"], "modulo": o.get("NomMdl"), "ramo_deck": paralelos[0]["ramo_id"], "motivo": f"o deck já tem {len(paralelos)} trafo(s) {alta:g}/{baixa:g} kV na subestação; a obra é o {rot}"})
+            no_deck.append(
+                {
+                    "IdeMdl": o["IdeMdl"],
+                    "modulo": o.get("NomMdl"),
+                    "ramo_deck": paralelos[0]["ramo_id"],
+                    "motivo": f"o deck já tem {len(paralelos)} trafo(s) {alta:g}/{baixa:g} kV na subestação; a obra é o {rot}",
+                }
+            )
             continue
         n_tr += 1
         de, para = sorted((ha, hb))
         rid = f"R{de.lstrip('B')}-{para.lstrip('B')}-S{o['IdeMdl']}"
         x = paralelos[0]["x_pct"] if paralelos else None
-        ev(o, d, "entra", "ramos", entidade_id=rid, registro={
-            "ramo_id": rid, "de": de, "para": para, "circuito": n_idx or None, "tipo": "trafo", "nome": o.get("NomMdl"),
-            "x_pct": x, "cap_normal_mva": paralelos[0].get("cap_normal_mva") if paralelos else None,
-            "cap_emerg_mva": paralelos[0].get("cap_emerg_mva") if paralelos else None, "estado_base": "ligado",
-        })
-        eventos[-1]["nota"] += f" | x_pct e capacidade do trafo paralelo {paralelos[0]['ramo_id']}" if paralelos else " | x_pct desconhecido (sem trafo paralelo no deck)"
+        ev(
+            o,
+            d,
+            "entra",
+            "ramos",
+            entidade_id=rid,
+            registro={
+                "ramo_id": rid,
+                "de": de,
+                "para": para,
+                "circuito": n_idx or None,
+                "tipo": "trafo",
+                "nome": o.get("NomMdl"),
+                "x_pct": x,
+                "cap_normal_mva": paralelos[0].get("cap_normal_mva") if paralelos else None,
+                "cap_emerg_mva": paralelos[0].get("cap_emerg_mva") if paralelos else None,
+                "estado_base": "ligado",
+            },
+        )
+        eventos[-1]["nota"] += (
+            f" | x_pct e capacidade do trafo paralelo {paralelos[0]['ramo_id']}"
+            if paralelos
+            else " | x_pct desconhecido (sem trafo paralelo no deck)"
+        )
 
     # barra nova entra na data do primeiro ramo que a usa
     primeira: dict[str, str] = {}
@@ -333,6 +454,14 @@ def montar(
             e["data"] = primeira[e["entidade_id"]]
 
     return {
-        "eventos": eventos, "pendencias": pendencias, "no_deck": no_deck,
-        "contagem": {"lt_novas": n_lt, "barras_em_subestacao_nova": len(barras_criadas), "seccionamentos": n_sec, "transformacoes": n_tr, "barras_novas": len(novas_barras)},
+        "eventos": eventos,
+        "pendencias": pendencias,
+        "no_deck": no_deck,
+        "contagem": {
+            "lt_novas": n_lt,
+            "barras_em_subestacao_nova": len(barras_criadas),
+            "seccionamentos": n_sec,
+            "transformacoes": n_tr,
+            "barras_novas": len(novas_barras),
+        },
     }

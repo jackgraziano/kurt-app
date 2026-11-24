@@ -36,10 +36,7 @@ def simplificar(pts: np.ndarray, tol: float) -> np.ndarray:
         seg = pts[i + 1 : j]
         d = b - a
         L = np.hypot(*d)
-        if L == 0:
-            dist = np.hypot(*(seg - a).T)
-        else:
-            dist = np.abs(d[0] * (seg[:, 1] - a[1]) - d[1] * (seg[:, 0] - a[0])) / L
+        dist = np.hypot(*(seg - a).T) if L == 0 else np.abs(d[0] * (seg[:, 1] - a[1]) - d[1] * (seg[:, 0] - a[0])) / L
         k = int(np.argmax(dist))
         if dist[k] > tol:
             m = i + 1 + k
@@ -77,8 +74,10 @@ def main() -> None:
                 aneis.append(np.round(s, 2).tolist())
         saida[uf] = aneis
     SAIDA.write_text(json.dumps(saida, separators=(",", ":")))
-    print(f"{SAIDA}: {len(saida)} UFs, {sum(len(a) for v in saida.values() for a in v)} vértices, "
-          f"{SAIDA.stat().st_size // 1024} KB")
+    print(
+        f"{SAIDA}: {len(saida)} UFs, {sum(len(a) for v in saida.values() for a in v)} vértices, "
+        f"{SAIDA.stat().st_size // 1024} KB"
+    )
 
 
 if __name__ == "__main__":

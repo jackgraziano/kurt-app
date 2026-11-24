@@ -61,13 +61,14 @@ def eventos_de_linhas(texto: str) -> list[dict]:
                             "circuito": None,
                             "x_pct": _num(r.get("x_pct")),
                             "cap_normal_mva": _num(r.get("cap_normal_mva")),
-                            "nome": ((r.get("nome") or "").strip() or None) and (r["nome"].strip() + (f" ({k + 1})" if n > 1 else "")),
+                            "nome": ((r.get("nome") or "").strip() or None)
+                            and (r["nome"].strip() + (f" ({k + 1})" if n > 1 else "")),
                             "estado_base": "ligado",
                         },
                     }
                 )
         except (KeyError, ValueError) as e:
-            raise ValueError(f"linhas.csv, linha {i}: {e}")
+            raise ValueError(f"linhas.csv, linha {i}: {e}") from e
     return out
 
 
@@ -90,5 +91,5 @@ def eventos_de_usinas(texto: str) -> list[dict]:
                 }
             )
         except (KeyError, ValueError) as e:
-            raise ValueError(f"usinas.csv, linha {i}: {e}")
+            raise ValueError(f"usinas.csv, linha {i}: {e}") from e
     return out

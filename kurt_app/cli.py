@@ -57,8 +57,10 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         texto = Path(a.arquivo).read_text(encoding="utf-8")
         evs = (
-            eventos_de_linhas(texto) if a.tipo == "linhas"
-            else eventos_de_usinas(texto) if a.tipo == "usinas"
+            eventos_de_linhas(texto)
+            if a.tipo == "linhas"
+            else eventos_de_usinas(texto)
+            if a.tipo == "usinas"
             else json.loads(texto)
         )
         prontos = cens.adicionar_eventos(a.nome, evs)

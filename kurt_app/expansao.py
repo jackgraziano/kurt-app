@@ -23,23 +23,67 @@ import difflib
 import re
 import unicodedata
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import date
-from typing import Any, Iterable
+from typing import Any
 
 ROMANOS = {
-    "I": "1", "II": "2", "III": "3", "IV": "4", "V": "5", "VI": "6", "VII": "7", "VIII": "8",
-    "IX": "9", "X": "10", "XI": "11", "XII": "12", "XIII": "13", "XIV": "14", "XV": "15",
+    "I": "1",
+    "II": "2",
+    "III": "3",
+    "IV": "4",
+    "V": "5",
+    "VI": "6",
+    "VII": "7",
+    "VIII": "8",
+    "IX": "9",
+    "X": "10",
+    "XI": "11",
+    "XII": "12",
+    "XIII": "13",
+    "XIV": "14",
+    "XV": "15",
 }
 # palavras que não ajudam a identificar a subestação
 VAZIAS = {
-    "SE", "SUBESTACAO", "SUBESTACOES", "USINA", "UHE", "UTE", "PCH", "EOL", "UFV", "LT", "KV", "DE", "DA",
-    "DO", "DAS", "DOS", "E", "C1", "C2", "SECCIONADORA", "COLETORA", "ELEVADORA", "ANTIGA",
+    "SE",
+    "SUBESTACAO",
+    "SUBESTACOES",
+    "USINA",
+    "UHE",
+    "UTE",
+    "PCH",
+    "EOL",
+    "UFV",
+    "LT",
+    "KV",
+    "DE",
+    "DA",
+    "DO",
+    "DAS",
+    "DOS",
+    "E",
+    "C1",
+    "C2",
+    "SECCIONADORA",
+    "COLETORA",
+    "ELEVADORA",
+    "ANTIGA",
 }
 # abreviações comuns nos nomes por extenso (o código do deck usa a forma curta)
 ABREV = {
-    "SAO": "S", "SANTO": "STO", "SANTA": "STA", "NOSSA": "N", "SENHORA": "SRA", "PRESIDENTE": "PRES",
-    "GOVERNADOR": "GOV", "DOUTOR": "DR", "ENGENHEIRO": "ENG", "CORONEL": "CEL", "MONSENHOR": "MONS",
+    "SAO": "S",
+    "SANTO": "STO",
+    "SANTA": "STA",
+    "NOSSA": "N",
+    "SENHORA": "SRA",
+    "PRESIDENTE": "PRES",
+    "GOVERNADOR": "GOV",
+    "DOUTOR": "DR",
+    "ENGENHEIRO": "ENG",
+    "CORONEL": "CEL",
+    "MONSENHOR": "MONS",
 }
 SEM_CONEXAO = {"", "OUTRO", "OUTROS", "NAO DEFINIDA NA OUTORGA", "NAO DEFINIDA NA OUTORGAA"}
 
@@ -101,8 +145,14 @@ def score_codigo(nome: str, codigo: str) -> float:
         return 0.0
     num_nome = next((t for t in reversed(tk) if t.isdigit()), None)
     # com os conectivos (Morro do Chapéu -> MDCHAP) e sem eles (MCHAP)
-    tk_com = [ROMANOS.get(t, t) for t in re.sub(r"[^A-Z0-9]+", " ", sem_acento(nome).upper()).split() if t not in VAZIAS - CONECTIVOS]
-    letras_nome = [x for x in {"".join(t for t in tk if not t.isdigit()), "".join(t for t in tk_com if not t.isdigit())} if x]
+    tk_com = [
+        ROMANOS.get(t, t)
+        for t in re.sub(r"[^A-Z0-9]+", " ", sem_acento(nome).upper()).split()
+        if t not in VAZIAS - CONECTIVOS
+    ]
+    letras_nome = [
+        x for x in {"".join(t for t in tk if not t.isdigit()), "".join(t for t in tk_com if not t.isdigit())} if x
+    ]
     num_cod = "".join(c for c in cod if c.isdigit()) or None
     letras_cod = "".join(c for c in cod if c.isalpha())
     if num_nome and not num_cod and num_nome in ROMANO_DE:
@@ -185,7 +235,7 @@ def _mes(d: date) -> date:
     return date(d.year, d.month, 1)
 
 
-def _proximo_mes(d: date) -> date:
+def proximo_mes(d: date) -> date:
     return date(d.year + (d.month == 12), d.month % 12 + 1, 1)
 
 
@@ -288,7 +338,9 @@ def casar_usina(u: dict, idx: dict[str, dict[str, Subestacao]]) -> Casamento:
             c.via = "seccionamento"
             return c
         cand = sorted({x for c in melhores for x in c.candidatos}, key=lambda x: -x[1])[:3]
-        return Casamento(None, None, max((c.score for c in melhores), default=0.0), cand, "nenhum", "seccionamento sem ponta casada")
+        return Casamento(
+            None, None, max((c.score for c in melhores), default=0.0), cand, "nenhum", "seccionamento sem ponta casada"
+        )
     return casar_nome(nome, uf, kv, idx)
 
 
@@ -321,7 +373,7 @@ def montar(
     unidades: dict[str, list[dict]] = defaultdict(list)
     for g in unidades_ralie:
         unidades[g["CodCEG"]].append(g)
-    primeiro = _proximo_mes(data_base)
+    primeiro = proximo_mes(data_base)
 
     # complexos: conexão casada de uma usina vale para as do mesmo complexo sem conexão
     casamentos: dict[str, Casamento] = {}
@@ -339,7 +391,9 @@ def montar(
         cx = (u.get("NomComplexo") or "").strip()
         if not c.barra_id and cx in por_complexo and c.motivo.startswith("sem ponto"):
             o = por_complexo[cx]
-            casamentos[u["CodCEG"]] = Casamento(o.subestacao, o.barra_id, round(o.score * 0.9, 3), o.candidatos, "complexo")
+            casamentos[u["CodCEG"]] = Casamento(
+                o.subestacao, o.barra_id, round(o.score * 0.9, 3), o.candidatos, "complexo"
+            )
 
     eventos, pendencias, no_deck, casadas = [], [], [], []
     for u in sin:
@@ -389,12 +443,20 @@ def montar(
             vizinhas += deck_por_uf_fonte.get((uf_sub[0], fonte), [])
         nomes = [u.get("NomEmpreendimento") or "", u.get("NomComplexo") or ""]
         dup = max(
-            ((parecidos(n, nome_usina_deck(v["nome"])), v) for v in vizinhas if v["fonte_energia"] == fonte for n in nomes if n),
+            (
+                (parecidos(n, nome_usina_deck(v["nome"])), v)
+                for v in vizinhas
+                if v["fonte_energia"] == fonte
+                for n in nomes
+                if n
+            ),
             key=lambda x: x[0],
             default=(0.0, None),
         )
         if dup[0] >= LIMIAR_DUP:
-            no_deck.append({**linha, "usina_deck": dup[1]["usina_id"], "nome_deck": dup[1]["nome"], "semelhanca": round(dup[0], 3)})
+            no_deck.append(
+                {**linha, "usina_deck": dup[1]["usina_id"], "nome_deck": dup[1]["nome"], "semelhanca": round(dup[0], 3)}
+            )
             continue
         b = barra_por_id[c.barra_id]
         uid = f"{fonte}-A{u.get('IdeNucleoCEG') or cod}"
@@ -446,5 +508,13 @@ def montar(
                         "nota": f"RALIE {cod}: potência acumulada das UG previstas até {mes.strftime('%m/%Y')}",
                     }
                 )
-        casadas.append({**linha, "usina_id": uid, "barra_id": c.barra_id, "subestacao": c.subestacao, "submercado": b.get("submercado")})
+        casadas.append(
+            {
+                **linha,
+                "usina_id": uid,
+                "barra_id": c.barra_id,
+                "subestacao": c.subestacao,
+                "submercado": b.get("submercado"),
+            }
+        )
     return {"eventos": eventos, "pendencias": pendencias, "no_deck": no_deck, "casadas": casadas}

@@ -55,7 +55,7 @@ def _d(s: Any) -> date:
     try:
         return date.fromisoformat(str(s))
     except ValueError:
-        raise CenarioErro(f"data inválida: {s!r} (use AAAA-MM-DD)")
+        raise CenarioErro(f"data inválida: {s!r} (use AAAA-MM-DD)") from None
 
 
 def _vigente(r: dict, d: date) -> bool:
@@ -182,9 +182,7 @@ def aplicar(base: Cadastro, eventos: list[dict]) -> tuple[dict[str, pa.Table], l
 
 def _posicionar_barras_novas(barras: list[dict], ramos: list[dict]) -> None:
     """Barra nova sem posição: subestação conhecida, vizinhos, ou centro da UF."""
-    pos_sub = {
-        b["subestacao"]: (b["pos_x"], b["pos_y"]) for b in barras if b.get("pos_x") is not None
-    }
+    pos_sub = {b["subestacao"]: (b["pos_x"], b["pos_y"]) for b in barras if b.get("pos_x") is not None}
     pos_barra = {b["barra_id"]: (b["pos_x"], b["pos_y"]) for b in barras if b.get("pos_x") is not None}
     for b in barras:
         if b.get("pos_x") is not None:
@@ -194,7 +192,9 @@ def _posicionar_barras_novas(barras: list[dict], ramos: list[dict]) -> None:
             viz = [
                 pos_barra[o]
                 for r in ramos
-                for o in ((r["para"],) if r["de"] == b["barra_id"] else (r["de"],) if r["para"] == b["barra_id"] else ())
+                for o in (
+                    (r["para"],) if r["de"] == b["barra_id"] else (r["de"],) if r["para"] == b["barra_id"] else ()
+                )
                 if o in pos_barra
             ]
             if viz:

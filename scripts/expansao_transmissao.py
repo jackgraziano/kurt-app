@@ -70,7 +70,9 @@ def main() -> int:
             req = urllib.request.Request(f"{PACOTE}/{rid}/download/{nome}", headers={"User-Agent": "kurt-app"})
             with urllib.request.urlopen(req, timeout=300) as r:
                 alvo.write_bytes(r.read())
-    obras = ler(pasta / "siget-contrato-empreendimento-obra-modulo.csv") + ler(pasta / "siget-resolucao-empreendimento-obra-modulo.csv")
+    obras = ler(pasta / "siget-contrato-empreendimento-obra-modulo.csv") + ler(
+        pasta / "siget-resolucao-empreendimento-obra-modulo.csv"
+    )
     lts = ler(pasta / "siget-contrato-modulolinhatransmissao-subestacaoorigem-subestacaodestino.csv") + ler(
         pasta / "siget-resolucao-modulolinhatransmissao-subestacaoorigem-subestacaodestino.csv"
     )
@@ -79,20 +81,41 @@ def main() -> int:
     pasta_cad = Path(a.cadastro)
     base = {t: pq.read_table(pasta_cad / f"{t}.parquet").to_pylist() for t in ("barras", "ramos")}
     cad = Cadastro(pasta_cad)
-    r = montar(obras, lts, base, date.fromisoformat(cad.data_base()), f"ANEEL SIGET {data_siget}", date.fromisoformat(a.horizonte))
+    r = montar(
+        obras,
+        lts,
+        base,
+        date.fromisoformat(cad.data_base()),
+        f"ANEEL SIGET {data_siget}",
+        date.fromisoformat(a.horizonte),
+    )
 
     saida = RAIZ / "dados" / "cenarios" / pasta_cad.resolve().name
     aux = saida / "expansao_arquivos"
     aux.mkdir(parents=True, exist_ok=True)
     (aux / "transmissao_eventos.json").write_text(json.dumps(r["eventos"], ensure_ascii=False, indent=1) + "\n")
-    gravar_csv(saida / "transmissao_pendencias.csv", r["pendencias"], ["IdeMdl", "modulo", "data", "motivo", "candidatos", "obra"])
+    gravar_csv(
+        saida / "transmissao_pendencias.csv",
+        r["pendencias"],
+        ["IdeMdl", "modulo", "data", "motivo", "candidatos", "obra"],
+    )
     gravar_csv(saida / "transmissao_no_deck.csv", r["no_deck"], ["IdeMdl", "modulo", "ramo_deck", "motivo"])
 
     cens = Cenarios(cad, saida)
     ja = {e["evento_id"] for e in cens.ler(a.cenario).get("eventos", [])}
     novos = [e for e in r["eventos"] if e["evento_id"] not in ja]
     prontos = cens.adicionar_eventos(a.cenario, novos)
-    print(json.dumps({**r["contagem"], "eventos_importados": len(prontos), "pendencias": len(r["pendencias"]), "ja_no_deck": len(r["no_deck"])}, ensure_ascii=False))
+    print(
+        json.dumps(
+            {
+                **r["contagem"],
+                "eventos_importados": len(prontos),
+                "pendencias": len(r["pendencias"]),
+                "ja_no_deck": len(r["no_deck"]),
+            },
+            ensure_ascii=False,
+        )
+    )
     return 0
 
 

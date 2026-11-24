@@ -47,15 +47,22 @@ def test_sai_e_altera(cens):
         "s1",
         [
             {"data": "2027-01-01", "acao": "sai", "entidade": "ramos", "entidade_id": "R5350-5924-7"},
-            {"data": "2027-03-01", "acao": "altera", "entidade": "usinas", "entidade_id": "U45125-1",
-             "campos": {"cap_mw": 900.0}},
+            {
+                "data": "2027-03-01",
+                "acao": "altera",
+                "entidade": "usinas",
+                "entidade_id": "U45125-1",
+                "campos": {"cap_mw": 900.0},
+            },
         ],
     )
     cad = cens.cadastro("s1")
     assert "R5350-5924-7" not in {r["ramo_id"] for r in cad.configuracao("2027-02-01")["ramos"]}
     assert "R5350-5924-7" in {r["ramo_id"] for r in cad.configuracao("2026-12-01")["ramos"]}
-    caps = {d: next(u["cap_mw"] for u in cad.configuracao(d)["usinas"] if u["usina_id"] == "U45125-1")
-            for d in ("2027-02-01", "2027-04-01")}
+    caps = {
+        d: next(u["cap_mw"] for u in cad.configuracao(d)["usinas"] if u["usina_id"] == "U45125-1")
+        for d in ("2027-02-01", "2027-04-01")
+    }
     assert caps == {"2027-02-01": 680.0, "2027-04-01": 900.0}
     ficha = cad.entidade("usinas", "U45125-1")
     assert len(ficha["versoes"]) == 2
@@ -68,8 +75,9 @@ def test_camadas(cens):
     cens.adicionar_eventos("expansao", [linha_nova("2027-01-01")])
     cens.criar("atraso", pai="expansao")
     # sensibilidade: a linha da expansão atrasa seis meses
-    cens.adicionar_eventos("atraso", [{"data": "2027-01-01", "acao": "sai", "entidade": "ramos",
-                                       "entidade_id": "R5350-5924-N1"}])
+    cens.adicionar_eventos(
+        "atraso", [{"data": "2027-01-01", "acao": "sai", "entidade": "ramos", "entidade_id": "R5350-5924-N1"}]
+    )
     cens.adicionar_eventos("atraso", [linha_nova("2027-07-01")])
     cad = cens.cadastro("atraso")
     ids = lambda d: {r["ramo_id"] for r in cad.configuracao(d)["ramos"]}  # noqa: E731
@@ -77,8 +85,10 @@ def test_camadas(cens):
     assert "R5350-5924-N2" in ids("2027-08-01")
     # mudar o pai invalida o cache do filho
     cens.adicionar_eventos("expansao", [linha_nova("2027-02-01", de="B5350", para="B5428")])
-    assert any(r["para"] == "B5428" and r["fonte"] == "usuario"
-               for r in cens.cadastro("atraso").configuracao("2027-03-01")["ramos"])
+    assert any(
+        r["para"] == "B5428" and r["fonte"] == "usuario"
+        for r in cens.cadastro("atraso").configuracao("2027-03-01")["ramos"]
+    )
 
 
 def test_erros(cens):
@@ -88,8 +98,18 @@ def test_erros(cens):
     with pytest.raises(CenarioErro):
         cens.adicionar_eventos("s1", [{"data": "2027-01-01", "acao": "sai", "entidade": "ramos", "entidade_id": "zz"}])
     with pytest.raises(CenarioErro):
-        cens.adicionar_eventos("s1", [{"data": "2027-01-01", "acao": "altera", "entidade": "usinas",
-                                       "entidade_id": "U45125-1", "campos": {"vigente_de": "2020-01-01"}}])
+        cens.adicionar_eventos(
+            "s1",
+            [
+                {
+                    "data": "2027-01-01",
+                    "acao": "altera",
+                    "entidade": "usinas",
+                    "entidade_id": "U45125-1",
+                    "campos": {"vigente_de": "2020-01-01"},
+                }
+            ],
+        )
     with pytest.raises(CenarioErro):
         cens.criar("Nome Inválido")
     assert cens.ler("s1")["eventos"] == []  # nada gravado quando falha
@@ -98,8 +118,9 @@ def test_erros(cens):
 def test_remover_evento_com_dependente(cens):
     cens.criar("s1")
     (ev,) = cens.adicionar_eventos("s1", [linha_nova()])
-    cens.adicionar_eventos("s1", [{"data": "2027-05-01", "acao": "sai", "entidade": "ramos",
-                                   "entidade_id": ev["entidade_id"]}])
+    cens.adicionar_eventos(
+        "s1", [{"data": "2027-05-01", "acao": "sai", "entidade": "ramos", "entidade_id": ev["entidade_id"]}]
+    )
     with pytest.raises(CenarioErro):
         cens.remover_evento("s1", ev["evento_id"])  # a saída depende da entrada
 
@@ -109,8 +130,12 @@ def test_barra_nova_ganha_posicao(cens):
     cens.adicionar_eventos(
         "s1",
         [
-            {"data": "2027-01-01", "acao": "entra", "entidade": "barras",
-             "registro": {"barra_id": "BX1", "nome": "NOVA--RN500", "kv": 500.0, "subestacao": "NOVA", "uf": "RN"}},
+            {
+                "data": "2027-01-01",
+                "acao": "entra",
+                "entidade": "barras",
+                "registro": {"barra_id": "BX1", "nome": "NOVA--RN500", "kv": 500.0, "subestacao": "NOVA", "uf": "RN"},
+            },
             linha_nova(de="BX1", para="B5350"),
         ],
     )
@@ -147,9 +172,12 @@ def test_api_cenarios(tmp_path):
     m = cli.get("/api/meta", params={"cenario": "s1"}).json()
     assert m["fim"] >= "2031-01-01" and m["data_base"] == "2026-09-10"
     assert cli.post("/api/cenarios/s1/eventos", json=linha_nova(de="B1")).status_code == 422
-    r = cli.post("/api/cenarios/s1/importar", params={"tipo": "usinas"},
-                 content="data,nome,fonte_energia,barra,cap_mw\n2027-06-01,UFV Z,UFV,5350,300\n",
-                 headers={"content-type": "text/plain"})
+    r = cli.post(
+        "/api/cenarios/s1/importar",
+        params={"tipo": "usinas"},
+        content="data,nome,fonte_energia,barra,cap_mw\n2027-06-01,UFV Z,UFV,5350,300\n",
+        headers={"content-type": "text/plain"},
+    )
     assert r.status_code == 201, r.text
     assert cli.get("/api/cenarios/s1").json()["eventos"][-1]["registro"]["nome"] == "UFV Z"
     assert cli.delete(f"/api/cenarios/s1/eventos/{ev['evento_id']}").status_code == 204

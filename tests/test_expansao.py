@@ -7,7 +7,16 @@ from kurt_app.transmissao import montar as montar_transmissao
 
 
 def barra(num, nome, sub, kv, uf="RN", subm="NE"):
-    return {"barra_id": f"B{num}", "num_pwf": num, "nome": nome, "kv": kv, "subestacao": sub, "uf": uf, "submercado": subm, "area": 1}
+    return {
+        "barra_id": f"B{num}",
+        "num_pwf": num,
+        "nome": nome,
+        "kv": kv,
+        "subestacao": sub,
+        "uf": uf,
+        "submercado": subm,
+        "area": 1,
+    }
 
 
 BASE = {
@@ -19,11 +28,34 @@ BASE = {
         barra(5, "CEAMIR-RN500", "CEAMIR", 500.0),
     ],
     "usinas": [
-        {"usina_id": "EOL-7", "nome": "CNLBI  _CJ LAGOA DO BARRO I_05040_UEE", "fonte_energia": "EOL", "barra_id": "B4"},
+        {
+            "usina_id": "EOL-7",
+            "nome": "CNLBI  _CJ LAGOA DO BARRO I_05040_UEE",
+            "fonte_energia": "EOL",
+            "barra_id": "B4",
+        },
     ],
     "ramos": [
-        {"ramo_id": "R1-5-1", "de": "B1", "para": "B5", "circuito": 1, "tipo": "linha", "x_pct": 1.0, "cap_normal_mva": 2000.0, "cap_emerg_mva": 2400.0},
-        {"ramo_id": "R3-4-1", "de": "B3", "para": "B4", "circuito": 1, "tipo": "trafo", "x_pct": 0.8, "cap_normal_mva": 900.0, "cap_emerg_mva": 900.0},
+        {
+            "ramo_id": "R1-5-1",
+            "de": "B1",
+            "para": "B5",
+            "circuito": 1,
+            "tipo": "linha",
+            "x_pct": 1.0,
+            "cap_normal_mva": 2000.0,
+            "cap_emerg_mva": 2400.0,
+        },
+        {
+            "ramo_id": "R3-4-1",
+            "de": "B3",
+            "para": "B4",
+            "circuito": 1,
+            "tipo": "trafo",
+            "x_pct": 0.8,
+            "cap_normal_mva": 900.0,
+            "cap_emerg_mva": 900.0,
+        },
     ],
 }
 
@@ -44,17 +76,31 @@ def test_score_codigo():
 
 def usina(cod, nome, conexao, kv, fonte="EOL", obra="Em andamento", **kw):
     u = {
-        "CodCEG": cod, "IdeNucleoCEG": cod[-3:], "NomEmpreendimento": nome, "NomConexao": conexao,
-        "MdaTensaoConexao": kv, "SigUFPrincipal": "RN", "SigTipoGeracao": fonte, "DscOrigemCombustivel": "Eólica",
-        "DscSituacaoObra": obra, "DscSistema": "Sistema Interligado Nacional", "DscTipoConexao": "Subestação",
-        "NomComplexo": "", "DscViabilidade": "Média",
+        "CodCEG": cod,
+        "IdeNucleoCEG": cod[-3:],
+        "NomEmpreendimento": nome,
+        "NomConexao": conexao,
+        "MdaTensaoConexao": kv,
+        "SigUFPrincipal": "RN",
+        "SigTipoGeracao": fonte,
+        "DscOrigemCombustivel": "Eólica",
+        "DscSituacaoObra": obra,
+        "DscSistema": "Sistema Interligado Nacional",
+        "DscTipoConexao": "Subestação",
+        "NomComplexo": "",
+        "DscViabilidade": "Média",
     }
     u.update(kw)
     return u
 
 
 def ug(cod, kw, data):
-    return {"CodCEG": cod, "MdaPotenciaUnitaria": kw, "DatPrevisaoOpComercialSFG": data, "DatUGInicioOpComerOutorgado": ""}
+    return {
+        "CodCEG": cod,
+        "MdaPotenciaUnitaria": kw,
+        "DatPrevisaoOpComercialSFG": data,
+        "DatUGInicioOpComerOutorgado": "",
+    }
 
 
 def test_eventos_ralie():
@@ -83,28 +129,69 @@ def test_eventos_ralie():
 
 
 def obra(mdl, nome, desc, data="30/06/2028"):
-    return {"IdeMdl": mdl, "IdeOnsMdl": f"M{mdl}", "NomMdl": nome, "DscObr": desc, "DscSitObr": "Em andamento", "DscTipObr": "Instalação", "SigTipMdl": nome.split()[0] if nome.startswith("LT") else "ME", "DatOprComEpd": data, "DatOprComObr": ""}
+    return {
+        "IdeMdl": mdl,
+        "IdeOnsMdl": f"M{mdl}",
+        "NomMdl": nome,
+        "DscObr": desc,
+        "DscSitObr": "Em andamento",
+        "DscTipObr": "Instalação",
+        "SigTipMdl": nome.split()[0] if nome.startswith("LT") else "ME",
+        "DatOprComEpd": data,
+        "DatOprComObr": "",
+    }
 
 
 def modulo(mdl, a, b, kv="500,00", km="100,0", c="1"):
-    return {"IdeMdl": mdl, "NomLinTms": f"LT {kv[:3]} kV {a} /{b} RN", "NomSubestacaoOrigem": a, "SigUFSubestacaoOrigem": "RN", "NomSubestacaoDestino": b, "SigUFSubestacaoDestino": "RN", "NumTensaoBaseLinhaTransm": kv, "NumEtnLinTms": km, "NumCcuLinTms": c}
+    return {
+        "IdeMdl": mdl,
+        "NomLinTms": f"LT {kv[:3]} kV {a} /{b} RN",
+        "NomSubestacaoOrigem": a,
+        "SigUFSubestacaoOrigem": "RN",
+        "NomSubestacaoDestino": b,
+        "SigUFSubestacaoDestino": "RN",
+        "NumTensaoBaseLinhaTransm": kv,
+        "NumEtnLinTms": km,
+        "NumCcuLinTms": c,
+    }
 
 
 def test_eventos_transmissao():
     obras = [
         obra("1", "LT 500 kV ACU III /CEARA MIRIM C-1 RN", "Construção da LT 500 kV, 1195/1350 MVA"),
-        obra("2", "LT 500 kV JOAO CAMARA III /SERRA NOVA C-1 RN", "Instalar o circuito LT 500 kV JOAO CAMARA III /SERRA NOVA C-1 RN originado do seccionamento do circuito LT 500 kV JOAO CAMARA III /CEARA MIRIM C-1 RN na SE Serra Nova"),
-        obra("3", "LT 500 kV SERRA NOVA /CEARA MIRIM C-1 RN", "Instalar o circuito LT 500 kV SERRA NOVA /CEARA MIRIM C-1 RN originado do seccionamento do circuito LT 500 kV JOAO CAMARA III /CEARA MIRIM C-1 RN na SE Serra Nova"),
+        obra(
+            "2",
+            "LT 500 kV JOAO CAMARA III /SERRA NOVA C-1 RN",
+            "Instalar o circuito LT 500 kV JOAO CAMARA III /SERRA NOVA C-1 RN originado do seccionamento do circuito LT 500 kV JOAO CAMARA III /CEARA MIRIM C-1 RN na SE Serra Nova",
+        ),
+        obra(
+            "3",
+            "LT 500 kV SERRA NOVA /CEARA MIRIM C-1 RN",
+            "Instalar o circuito LT 500 kV SERRA NOVA /CEARA MIRIM C-1 RN originado do seccionamento do circuito LT 500 kV JOAO CAMARA III /CEARA MIRIM C-1 RN na SE Serra Nova",
+        ),
         obra("4", "TR 500/230 kV ACU III TR2 RN", ""),
     ]
-    mods = [modulo("1", "ACU III", "CEARA MIRIM"), modulo("2", "JOAO CAMARA III", "SERRA NOVA", km="30,0"), modulo("3", "SERRA NOVA", "CEARA MIRIM", km="70,0")]
+    mods = [
+        modulo("1", "ACU III", "CEARA MIRIM"),
+        modulo("2", "JOAO CAMARA III", "SERRA NOVA", km="30,0"),
+        modulo("3", "SERRA NOVA", "CEARA MIRIM", km="70,0"),
+    ]
     r = montar_transmissao(obras, mods, BASE, date(2026, 11, 20), "ANEEL SIGET teste")
     acoes = sorted((e["acao"], e["entidade"]) for e in r["eventos"])
-    assert acoes == [("entra", "barras"), ("entra", "ramos"), ("entra", "ramos"), ("entra", "ramos"), ("entra", "ramos"), ("sai", "ramos")]
+    assert acoes == [
+        ("entra", "barras"),
+        ("entra", "ramos"),
+        ("entra", "ramos"),
+        ("entra", "ramos"),
+        ("entra", "ramos"),
+        ("sai", "ramos"),
+    ]
     lt = next(e for e in r["eventos"] if e["entidade_id"].endswith("S1"))
     assert {lt["registro"]["de"], lt["registro"]["para"]} == {"B3", "B5"} and lt["registro"]["cap_normal_mva"] == 1195.0
     assert next(e for e in r["eventos"] if e["acao"] == "sai")["entidade_id"] == "R1-5-1"
-    xs = sorted(e["registro"]["x_pct"] for e in r["eventos"] if e["acao"] == "entra" and e["entidade_id"].endswith(("S2", "S3")))
+    xs = sorted(
+        e["registro"]["x_pct"] for e in r["eventos"] if e["acao"] == "entra" and e["entidade_id"].endswith(("S2", "S3"))
+    )
     assert xs == [0.3, 0.7]
     tr = next(e for e in r["eventos"] if e.get("registro", {}).get("tipo") == "trafo")
     assert tr["registro"]["x_pct"] == 0.8 and r["contagem"]["seccionamentos"] == 1

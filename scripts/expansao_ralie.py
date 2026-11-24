@@ -100,10 +100,30 @@ def main() -> int:
         for i in range(3):
             c = p_["candidatos"][i] if i < len(p_["candidatos"]) else ("", "")
             p_[f"candidato{i + 1}"], p_[f"score{i + 1}"] = c
-    cols = ["CodCEG", "nome", "complexo", "fonte", "uf", "conexao", "tensao_kv", "mw_ate_horizonte", "primeira_data", "situacao_obra", "motivo"]
-    gravar_csv(saida / "expansao_pendencias.csv", r["pendencias"], cols + ["candidato1", "score1", "candidato2", "score2", "candidato3", "score3"])
-    gravar_csv(saida / "expansao_no_deck.csv", r["no_deck"], cols + ["usina_deck", "nome_deck", "semelhanca"])
-    gravar_csv(saida / "expansao_casadas.csv", r["casadas"], cols + ["via", "score", "subestacao", "barra_id", "submercado", "usina_id"])
+    cols = [
+        "CodCEG",
+        "nome",
+        "complexo",
+        "fonte",
+        "uf",
+        "conexao",
+        "tensao_kv",
+        "mw_ate_horizonte",
+        "primeira_data",
+        "situacao_obra",
+        "motivo",
+    ]
+    gravar_csv(
+        saida / "expansao_pendencias.csv",
+        r["pendencias"],
+        [*cols, "candidato1", "score1", "candidato2", "score2", "candidato3", "score3"],
+    )
+    gravar_csv(saida / "expansao_no_deck.csv", r["no_deck"], [*cols, "usina_deck", "nome_deck", "semelhanca"])
+    gravar_csv(
+        saida / "expansao_casadas.csv",
+        r["casadas"],
+        [*cols, "via", "score", "subestacao", "barra_id", "submercado", "usina_id"],
+    )
 
     cens = Cenarios(cad, saida)
     existe = any(c["nome"] == a.cenario for c in cens.listar())

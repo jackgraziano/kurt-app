@@ -13,38 +13,130 @@ R = {"fonte": "deck", "confianca": "realizado"}
 
 
 def _cad(tmp_path, barras=None, ramos=None, usinas=None, restricoes=None, eventos=None):
-    barras = barras if barras is not None else [
-        {"barra_id": "A", "nome": "A", "kv": 500.0, "subestacao": "SA", "uf": "RN", "vigente_de": "2025-01-01", **R},
-        {"barra_id": "B", "nome": "B", "kv": 500.0, "subestacao": "SB", "uf": "CE", "vigente_de": "2025-01-01", **R},
-        {"barra_id": "C", "nome": "C", "kv": 230.0, "subestacao": "SB", "uf": "CE", "vigente_de": "2025-06-01", **R},
-    ]
-    ramos = ramos if ramos is not None else [
-        {"ramo_id": "AB", "de": "A", "para": "B", "tipo": "linha", "cap_normal_mva": 1000.0,
-         "vigente_de": "2025-01-01", "vigente_ate": "2025-09-01", **R},
-        {"ramo_id": "AB", "de": "A", "para": "B", "tipo": "linha", "cap_normal_mva": 1500.0,
-         "vigente_de": "2025-09-01", **R},
-        {"ramo_id": "BC", "de": "B", "para": "C", "tipo": "trafo", "vigente_de": "2025-06-01", **R},
-    ]
-    usinas = usinas if usinas is not None else [
-        {"usina_id": "U1", "nome": "U1", "fonte_energia": "EOL", "barra_id": "A", "cap_mw": 300.0,
-         "vigente_de": "2025-01-01", **R},
-        {"usina_id": "U2", "nome": "U2", "fonte_energia": "UFV", "barra_id": "C", "cap_mw": 100.0,
-         "vigente_de": "2025-06-01", "vigente_ate": "2026-01-01", **R},
-    ]
-    restricoes = restricoes if restricoes is not None else [
-        {"restr_id": "LPP1", "tipo": "LPP", "nome": "A-B", "termos": [{"elemento": "ramo", "id": "AB", "coeficiente": 1}],
-         "vigente_de": "2025-01-01", **R},
-    ]
-    eventos = eventos if eventos is not None else [
-        {"evento_id": "E1", "data": "2025-06-01", "acao": "entra", "entidade": "barras", "entidade_id": "C", **R},
-        {"evento_id": "E2", "data": "2025-09-01", "acao": "altera", "entidade": "ramos", "entidade_id": "AB",
-         "campos": {"cap_normal_mva": [1000, 1500]}, **R},
-    ]
-    escrever(tmp_path, {
-        "barras": tabela("barras", barras), "ramos": tabela("ramos", ramos),
-        "usinas": tabela("usinas", usinas), "restricoes": tabela("restricoes", restricoes),
-        "eventos": tabela("eventos", eventos),
-    })
+    barras = (
+        barras
+        if barras is not None
+        else [
+            {
+                "barra_id": "A",
+                "nome": "A",
+                "kv": 500.0,
+                "subestacao": "SA",
+                "uf": "RN",
+                "vigente_de": "2025-01-01",
+                **R,
+            },
+            {
+                "barra_id": "B",
+                "nome": "B",
+                "kv": 500.0,
+                "subestacao": "SB",
+                "uf": "CE",
+                "vigente_de": "2025-01-01",
+                **R,
+            },
+            {
+                "barra_id": "C",
+                "nome": "C",
+                "kv": 230.0,
+                "subestacao": "SB",
+                "uf": "CE",
+                "vigente_de": "2025-06-01",
+                **R,
+            },
+        ]
+    )
+    ramos = (
+        ramos
+        if ramos is not None
+        else [
+            {
+                "ramo_id": "AB",
+                "de": "A",
+                "para": "B",
+                "tipo": "linha",
+                "cap_normal_mva": 1000.0,
+                "vigente_de": "2025-01-01",
+                "vigente_ate": "2025-09-01",
+                **R,
+            },
+            {
+                "ramo_id": "AB",
+                "de": "A",
+                "para": "B",
+                "tipo": "linha",
+                "cap_normal_mva": 1500.0,
+                "vigente_de": "2025-09-01",
+                **R,
+            },
+            {"ramo_id": "BC", "de": "B", "para": "C", "tipo": "trafo", "vigente_de": "2025-06-01", **R},
+        ]
+    )
+    usinas = (
+        usinas
+        if usinas is not None
+        else [
+            {
+                "usina_id": "U1",
+                "nome": "U1",
+                "fonte_energia": "EOL",
+                "barra_id": "A",
+                "cap_mw": 300.0,
+                "vigente_de": "2025-01-01",
+                **R,
+            },
+            {
+                "usina_id": "U2",
+                "nome": "U2",
+                "fonte_energia": "UFV",
+                "barra_id": "C",
+                "cap_mw": 100.0,
+                "vigente_de": "2025-06-01",
+                "vigente_ate": "2026-01-01",
+                **R,
+            },
+        ]
+    )
+    restricoes = (
+        restricoes
+        if restricoes is not None
+        else [
+            {
+                "restr_id": "LPP1",
+                "tipo": "LPP",
+                "nome": "A-B",
+                "termos": [{"elemento": "ramo", "id": "AB", "coeficiente": 1}],
+                "vigente_de": "2025-01-01",
+                **R,
+            },
+        ]
+    )
+    eventos = (
+        eventos
+        if eventos is not None
+        else [
+            {"evento_id": "E1", "data": "2025-06-01", "acao": "entra", "entidade": "barras", "entidade_id": "C", **R},
+            {
+                "evento_id": "E2",
+                "data": "2025-09-01",
+                "acao": "altera",
+                "entidade": "ramos",
+                "entidade_id": "AB",
+                "campos": {"cap_normal_mva": [1000, 1500]},
+                **R,
+            },
+        ]
+    )
+    escrever(
+        tmp_path,
+        {
+            "barras": tabela("barras", barras),
+            "ramos": tabela("ramos", ramos),
+            "usinas": tabela("usinas", usinas),
+            "restricoes": tabela("restricoes", restricoes),
+            "eventos": tabela("eventos", eventos),
+        },
+    )
     return Cadastro(tmp_path)
 
 

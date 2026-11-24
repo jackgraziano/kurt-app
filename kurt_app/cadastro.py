@@ -7,6 +7,7 @@ vigentes em [vigente_de, vigente_ate).
 
 from __future__ import annotations
 
+import contextlib
 import json
 import threading
 from datetime import date
@@ -48,13 +49,11 @@ def _linhas(cur: duckdb.DuckDBPyConnection, tabela: Tabela) -> list[dict[str, An
     cols = [c[0] for c in cur.description]
     out = []
     for row in cur.fetchall():
-        d = dict(zip(cols, row))
+        d = dict(zip(cols, row, strict=True))
         for c in tabela.json:
             if d.get(c) is not None:
-                try:
+                with contextlib.suppress(TypeError, ValueError):
                     d[c] = json.loads(d[c])
-                except (TypeError, ValueError):
-                    pass
         for k, v in d.items():
             if isinstance(v, date):
                 d[k] = v.isoformat()
@@ -84,10 +83,7 @@ class Cadastro:
                 info = json.loads(arq.read_text()) if arq.exists() else {}
         else:
             self.pasta = Path(pasta) if pasta else Path(".")
-            tabelas = {
-                nome: tabelas.get(nome, t.schema.empty_table()).cast(t.schema)
-                for nome, t in TABELAS.items()
-            }
+            tabelas = {nome: tabelas.get(nome, t.schema.empty_table()).cast(t.schema) for nome, t in TABELAS.items()}
         self._con = duckdb.connect(":memory:")
         self._lock = threading.Lock()
         self.tabelas: dict[str, pa.Table] = tabelas
@@ -120,9 +116,7 @@ class Cadastro:
         with self._lock:
             datas = []
             for nome in ENTIDADES:
-                r = self._q(
-                    f"SELECT min(vigente_de), max(vigente_de), max(vigente_ate) FROM {nome}"
-                ).fetchone()
+                r = self._q(f"SELECT min(vigente_de), max(vigente_de), max(vigente_ate) FROM {nome}").fetchone()
                 datas.extend(d for d in r if d is not None)
             r = self._q("SELECT min(data), max(data) FROM eventos").fetchone()
             datas.extend(d for d in r if d is not None)
@@ -140,9 +134,7 @@ class Cadastro:
             "inicio": min(datas).isoformat() if datas else None,
             "fim": max(datas).isoformat() if datas else None,
             "data_base": self.data_base(),
-            "eventos_por_mes": [
-                {"mes": m, "n": n, "n_realizado": nr} for m, n, nr in meses
-            ],
+            "eventos_por_mes": [{"mes": m, "n": n, "n_realizado": nr} for m, n, nr in meses],
             "linhas": contagens,
             "info": self.info,
         }
@@ -231,9 +223,7 @@ class Cadastro:
         if tipo not in ENTIDADES:
             raise CadastroErro(f"tipo desconhecido: {tipo}")
         t = TABELAS[tipo]
-        versoes = self._sel(
-            t, f"SELECT * FROM {tipo} WHERE {t.chave} = ? ORDER BY vigente_de", [ident]
-        )
+        versoes = self._sel(t, f"SELECT * FROM {tipo} WHERE {t.chave} = ? ORDER BY vigente_de", [ident])
         if not versoes:
             raise KeyError(ident)
         evs = self._sel(
@@ -244,14 +234,16 @@ class Cadastro:
         rel: dict[str, Any] = {}
         if tipo == "barras":
             rel["ramos"] = sorted(
-                {r["ramo_id"] for r in self._sel(
-                    TABELAS["ramos"], "SELECT * FROM ramos WHERE de = ? OR para = ?", [ident, ident]
-                )}
+                {
+                    r["ramo_id"]
+                    for r in self._sel(TABELAS["ramos"], "SELECT * FROM ramos WHERE de = ? OR para = ?", [ident, ident])
+                }
             )
             rel["usinas"] = sorted(
-                {u["usina_id"] for u in self._sel(
-                    TABELAS["usinas"], "SELECT * FROM usinas WHERE barra_id = ?", [ident]
-                )}
+                {
+                    u["usina_id"]
+                    for u in self._sel(TABELAS["usinas"], "SELECT * FROM usinas WHERE barra_id = ?", [ident])
+                }
             )
         return {"tipo": tipo, "id": ident, "versoes": versoes, "eventos": evs, "relacionados": rel}
 
@@ -267,9 +259,7 @@ class Cadastro:
             alterados = []
             for k in sorted(ia.keys() & ib.keys()):
                 campos = {
-                    c: [ia[k].get(c), ib[k].get(c)]
-                    for c in ia[k]
-                    if c not in ignorar and ia[k].get(c) != ib[k].get(c)
+                    c: [ia[k].get(c), ib[k].get(c)] for c in ia[k] if c not in ignorar and ia[k].get(c) != ib[k].get(c)
                 }
                 if campos:
                     alterados.append({"id": k, "campos": campos})

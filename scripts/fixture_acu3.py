@@ -132,9 +132,7 @@ def main() -> None:
                 "num_deck": r["lpp"],
                 "nome": r["nome"],
                 "formula_texto": r["formula"],
-                "limites": [
-                    {"periodo": i + 1, "superior": v} for i, v in enumerate(r["limite"])
-                ],
+                "limites": [{"periodo": i + 1, "superior": v} for i, v in enumerate(r["limite"])],
                 "io_ons": "IO-ON.NE.5NE",
                 **BASE,
             }

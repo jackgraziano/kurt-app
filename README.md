@@ -14,7 +14,7 @@ Roda na máquina Linux, junto com os decks e o binário do Kurt. Não tem login,
   - `GET /api/entidade/{barras|ramos|usinas|restricoes}/{id}`: versões e eventos de uma entidade;
   - `GET /api/diferenca?a=&b=`: o que entrou, saiu ou mudou entre duas datas;
   - `GET /api/validacao`: checagens de qualidade.
-- **Mapa indicativo com linha do tempo:** subestações, ramos e usinas, mês a mês, com comparação entre duas datas, ficha de cada elemento e a lista de eventos do mês. As posições são aproximadas de propósito: cada subestação parte do centro da UF e um layout de molas a afasta das vizinhas.
+- **Mapa indicativo com linha do tempo:** subestações, ramos e usinas sobre o contorno das UFs, mês a mês, com comparação entre duas datas, ficha de cada elemento e a lista de eventos do mês. No play ou ao arrastar a linha do tempo, o que entrou (verde), mudou (roxo) ou saiu (vermelho) no mês pisca no mapa. As posições são aproximadas de propósito: cada subestação parte do centro da UF e um layout de molas a afasta das vizinhas, sem sair da UF.
 - **Checagens:** versões sobrepostas, domínios, JSON, referências a barras inexistentes, barras com usina ou carga isoladas e ilhas na rede.
 
 ## Cenários: o caso base projetado
@@ -49,6 +49,15 @@ data,nome,fonte_energia,barra,cap_mw,flag_corte,fonte,confianca,nota
 ```
 
 `circuitos` > 1 gera um ramo por circuito. Na API: `GET/POST /api/cenarios`, `POST /api/cenarios/{nome}/eventos`, `DELETE /api/cenarios/{nome}/eventos/{id}`, `POST /api/cenarios/{nome}/importar?tipo=linhas|usinas`, e todas as consultas aceitam `?cenario=`.
+
+### Cenário `expansao` a partir das fontes oficiais
+
+Dois scripts montam a expansão prevista sobre o caso base, com dados abertos da ANEEL:
+
+- `scripts/expansao_ralie.py`: usinas do RALIE (data prevista por unidade geradora e subestação de conexão), casadas com as barras do deck pelo nome da subestação, UF e tensão (`kurt_app/expansao.py`);
+- `scripts/expansao_transmissao.py`: LTs, seccionamentos e transformações de 230 kV ou mais do SIGET (`kurt_app/transmissao.py`).
+
+O que não casa com segurança vai para CSVs de pendências ao lado do cenário (`expansao_pendencias.csv`, `transmissao_pendencias.csv`), com os melhores candidatos, para revisão. Use `--recriar` no primeiro script para refazer o cenário do zero.
 
 ## Como rodar
 
@@ -90,16 +99,17 @@ O contrato entre os dois é o esquema dos Parquet e os subcomandos do Kurt.
 
 ## Próximos passos
 
-1. Extração do cadastro do SIN inteiro, jan/25 a nov/26, no repositório do Kurt.
-2. Cenário `expansao` povoado com as fontes oficiais (PAR/PEL, cronograma de obras de transmissão, outorgas ANEEL reconciliadas com NEWAVE/DECOMP).
+1. Revisar as pendências do cenário `expansao` (usinas sem ponto de conexão, casamentos ambíguos) e reconciliar os totais com NEWAVE/DECOMP.
+2. Merge de `kurt config extrair` (branch `feat/config-extrair` do Kurt) quando a fase 7 permitir.
 3. Rodadas do Kurt sobre um cenário, com resultados em P10, P50 e P90.
 
 ## Estrutura
 
 ```
-kurt_app/        backend: esquema, cadastro, validação, layout, API, CLI
+kurt_app/        backend: esquema, cadastro, cenários, validação, layout, API, CLI,
+                 importação da expansão (expansao.py, transmissao.py), ufs.json
 frontend/        TypeScript + Vite, sem framework; mapa em canvas
 fixtures/        cadastros de exemplo
-scripts/         geração de fixtures
-tests/           pytest
+scripts/         fixture, malha das UFs, montagem do cenário expansao
+tests/           pytest (make test roda também ruff e a checagem de tipos)
 ```

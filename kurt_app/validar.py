@@ -7,6 +7,7 @@ Cada checagem devolve problemas com severidade:
 
 from __future__ import annotations
 
+import itertools
 import json
 from collections import defaultdict
 from dataclasses import asdict, dataclass
@@ -42,11 +43,13 @@ def _versoes_sem_sobreposicao(cad: Cadastro) -> list[Problema]:
             for v in vs:
                 if v["vigente_ate"] is not None and v["vigente_ate"] <= v["vigente_de"]:
                     out.append(Problema("erro", "vigencia", nome, f"{ident}: vigente_ate <= vigente_de"))
-            for v1, v2 in zip(vs, vs[1:]):
+            for v1, v2 in itertools.pairwise(vs):
                 if v1["vigente_ate"] is None or v1["vigente_ate"] > v2["vigente_de"]:
                     out.append(
                         Problema(
-                            "erro", "vigencia", nome,
+                            "erro",
+                            "vigencia",
+                            nome,
                             f"{ident}: versões sobrepostas ({v1['vigente_de']} e {v2['vigente_de']})",
                         )
                     )
@@ -103,7 +106,9 @@ def _referencias_e_conexidade(cad: Cadastro) -> list[Problema]:
                     for c in campos:
                         if r[c] not in ids:
                             out.append(
-                                Problema("erro", "referencia", nome, f"{ds}: {r[tab.chave]}.{c} = {r[c]} sem barra vigente")
+                                Problema(
+                                    "erro", "referencia", nome, f"{ds}: {r[tab.chave]}.{c} = {r[c]} sem barra vigente"
+                                )
                             )
         # conexidade: barras com usina ou carga não podem ficar isoladas
         viz: dict[str, set[str]] = defaultdict(set)
@@ -118,7 +123,9 @@ def _referencias_e_conexidade(cad: Cadastro) -> list[Problema]:
         }
         isoladas = sorted(b for b in com_injecao if b in ids and not viz.get(b))
         if isoladas:
-            out.append(Problema("erro", "conexidade", "barras", f"{ds}: barras com usina ou carga isoladas: {isoladas[:10]}"))
+            out.append(
+                Problema("erro", "conexidade", "barras", f"{ds}: barras com usina ou carga isoladas: {isoladas[:10]}")
+            )
         # componentes: mais de uma ilha é aviso (recortes regionais são esperados)
         vistos: set[str] = set()
         ilhas = 0
@@ -140,12 +147,14 @@ def _referencias_e_conexidade(cad: Cadastro) -> list[Problema]:
 
 def _eventos_apontam(cad: Cadastro) -> list[Problema]:
     out = []
-    existentes = {
-        nome: {r[TABELAS[nome].chave] for r in _rows(cad.tabelas[nome])} for nome in ENTIDADES
-    }
+    existentes = {nome: {r[TABELAS[nome].chave] for r in _rows(cad.tabelas[nome])} for nome in ENTIDADES}
     for r in _rows(cad.tabelas["eventos"]):
         if r["entidade"] in existentes and r["entidade_id"] not in existentes[r["entidade"]]:
-            out.append(Problema("aviso", "eventos", "eventos", f"{r['evento_id']}: {r['entidade_id']} não existe em {r['entidade']}"))
+            out.append(
+                Problema(
+                    "aviso", "eventos", "eventos", f"{r['evento_id']}: {r['entidade_id']} não existe em {r['entidade']}"
+                )
+            )
     return out
 
 

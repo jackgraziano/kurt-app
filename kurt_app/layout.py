@@ -2,11 +2,13 @@
 
 Não usa coordenadas reais (decisão de 24/11/2026): cada subestação parte do
 centro aproximado da sua UF, e um layout de molas afasta as subestações e
-aproxima as que têm ramo entre si. O resultado é calculado uma vez, com todas
-as barras do período, para que nada salte de lugar quando o mês muda.
+aproxima as que têm ramo entre si, mantendo cada uma dentro do contorno da sua
+UF (malha do IBGE em ufs.json). Subestação sem UF herda a UF da maioria dos
+vizinhos. O resultado é calculado uma vez, com todas as barras do período, para
+que nada salte de lugar quando o mês muda.
 
-As coordenadas ficam em graus aproximados (x = longitude, y = latitude), só
-para manter a forma do país reconhecível.
+As coordenadas ficam em graus (x = longitude, y = latitude), as mesmas do
+contorno das UFs desenhado no fundo do mapa.
 """
 
 from __future__ import annotations
@@ -21,13 +23,33 @@ import pyarrow as pa
 
 # centro aproximado de cada UF (longitude, latitude); indicativo
 CENTRO_UF: dict[str, tuple[float, float]] = {
-    "AC": (-70.5, -9.0), "AL": (-36.6, -9.6), "AP": (-51.8, 1.4), "AM": (-64.6, -4.2),
-    "BA": (-41.7, -12.6), "CE": (-39.6, -5.1), "DF": (-47.9, -15.8), "ES": (-40.3, -19.6),
-    "GO": (-49.6, -16.0), "MA": (-45.3, -5.0), "MT": (-55.9, -12.6), "MS": (-54.6, -20.5),
-    "MG": (-44.6, -18.5), "PA": (-52.3, -4.0), "PB": (-36.8, -7.2), "PR": (-51.6, -24.6),
-    "PE": (-37.9, -8.4), "PI": (-42.7, -7.7), "RJ": (-42.9, -22.4), "RN": (-36.5, -5.8),
-    "RS": (-53.2, -29.8), "RO": (-63.0, -10.9), "RR": (-61.4, 2.1), "SC": (-50.5, -27.2),
-    "SP": (-48.5, -22.2), "SE": (-37.4, -10.6), "TO": (-48.3, -10.2),
+    "AC": (-70.5, -9.0),
+    "AL": (-36.6, -9.6),
+    "AP": (-51.8, 1.4),
+    "AM": (-64.6, -4.2),
+    "BA": (-41.7, -12.6),
+    "CE": (-39.6, -5.1),
+    "DF": (-47.9, -15.8),
+    "ES": (-40.3, -19.6),
+    "GO": (-49.6, -16.0),
+    "MA": (-45.3, -5.0),
+    "MT": (-55.9, -12.6),
+    "MS": (-54.6, -20.5),
+    "MG": (-44.6, -18.5),
+    "PA": (-52.3, -4.0),
+    "PB": (-36.8, -7.2),
+    "PR": (-51.6, -24.6),
+    "PE": (-37.9, -8.4),
+    "PI": (-42.7, -7.7),
+    "RJ": (-42.9, -22.4),
+    "RN": (-36.5, -5.8),
+    "RS": (-53.2, -29.8),
+    "RO": (-63.0, -10.9),
+    "RR": (-61.4, 2.1),
+    "SC": (-50.5, -27.2),
+    "SP": (-48.5, -22.2),
+    "SE": (-37.4, -10.6),
+    "TO": (-48.3, -10.2),
 }
 CENTRO_PADRAO = (-47.9, -15.8)
 
@@ -125,9 +147,7 @@ def posicoes(
     rad = np.array([raio_uf * (0.3 + 0.7 * _semente(s[::-1])) for s in nomes])
     pos = ancora + np.c_[np.cos(ang) * rad, np.sin(ang) * rad]
 
-    ar = np.array(
-        [(idx[a], idx[b]) for a, b in arestas if a in idx and b in idx and a != b], dtype=int
-    ).reshape(-1, 2)
+    ar = np.array([(idx[a], idx[b]) for a, b in arestas if a in idx and b in idx and a != b], dtype=int).reshape(-1, 2)
     dist_ideal = 0.45
     passo = 0.08
     for it in range(iteracoes):
@@ -141,12 +161,16 @@ def posicoes(
         ch_ord = chave[ordem]
         unicas, inicio = np.unique(ch_ord, return_index=True)
         fim = np.append(inicio[1:], len(ch_ord))
-        faixa = {int(u): (int(a), int(b)) for u, a, b in zip(unicas, inicio, fim)}
+        faixa = {int(u): (int(a), int(b)) for u, a, b in zip(unicas, inicio, fim, strict=True)}
         for u, (a, b) in faixa.items():
             cx, cy = divmod(u, 100_003) if u >= 0 else (u // 100_003, u % 100_003)
             meus = ordem[a:b]
-            viz = [ordem[slice(*faixa[k])] for dx in (-1, 0, 1) for dy in (-1, 0, 1)
-                   if (k := (cx + dx) * 100_003 + (cy + dy)) in faixa]
+            viz = [
+                ordem[slice(*faixa[k])]
+                for dx in (-1, 0, 1)
+                for dy in (-1, 0, 1)
+                if (k := (cx + dx) * 100_003 + (cy + dy)) in faixa
+            ]
             outros = np.concatenate(viz)
             d = pos[meus, None, :] - pos[None, outros, :]
             dist2 = (d**2).sum(-1) + 1e-6

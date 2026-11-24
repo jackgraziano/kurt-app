@@ -28,10 +28,7 @@ def tabela(nome: str, linhas: list[dict[str, Any]]) -> pa.Table:
     extras = {k for r in linhas for k in r} - set(t.nomes)
     if extras:
         raise ValueError(f"{nome}: colunas fora do esquema: {sorted(extras)}")
-    cols = {
-        c: pa.array([_normaliza(r.get(c), tipo, c in t.json) for r in linhas], type=tipo)
-        for c, tipo in t.colunas
-    }
+    cols = {c: pa.array([_normaliza(r.get(c), tipo, c in t.json) for r in linhas], type=tipo) for c, tipo in t.colunas}
     return pa.Table.from_pydict(cols, schema=t.schema)
 
 

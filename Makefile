@@ -28,6 +28,8 @@ servir-rede: front ## sobe aberto na rede local (sem login: só em rede confiáv
 	$(BIN)/kurt-app servir --cadastro $(CADASTRO) --porta $(PORTA) --host 0.0.0.0
 
 test:             ## testes do backend e checagem de tipos do front
+	$(BIN)/ruff check kurt_app scripts tests
+	$(BIN)/ruff format --check kurt_app scripts tests
 	$(BIN)/pytest -q
 	cd frontend && npm run check
 

@@ -134,6 +134,13 @@ $("#legenda").innerHTML = `
 // ---------- carregamento do mapa ----------
 let controlador: AbortController | null = null;
 
+function mostrarRotuloMes(): void {
+  const mes = mesAtual();
+  const data = fimDoMes(mes);
+  const futuro = meta.data_base && data > meta.data_base;
+  $("#mes-rotulo").innerHTML = `<b>${rotuloMes(mes)}</b><br><small>${futuro ? "projeção" : "situação"} em ${fmtData(data)}</small>`;
+}
+
 async function atualizar(): Promise<void> {
   const meu = ++pedido;
   // só a consulta mais recente interessa: cancela as que ainda estão em voo
@@ -146,8 +153,7 @@ async function atualizar(): Promise<void> {
   const kvs = $<HTMLSelectElement>("#kv").value;
   const kv = kvs ? Number(kvs) : undefined;
   const sub = $<HTMLSelectElement>("#sub").value || undefined;
-  const futuro = meta.data_base && data > meta.data_base;
-  $("#mes-rotulo").innerHTML = `<b>${rotuloMes(mes)}</b><br><small>${futuro ? "projeção" : "situação"} em ${fmtData(data)}</small>`;
+  mostrarRotuloMes();
 
   const comparar = $<HTMLInputElement>("#cmp-on").checked;
   const mesCmp = $<HTMLSelectElement>("#cmp-mes").value;
@@ -636,10 +642,7 @@ for (const id of ["#kv", "#sub", "#mmgd", "#cmp-on", "#cmp-mes"]) $(id).addEvent
 // ao arrastar a linha do tempo, o rótulo acompanha na hora e a consulta espera o controle parar
 let espera: number | undefined;
 $("#mes").addEventListener("input", () => {
-  const mes = mesAtual();
-  const data = fimDoMes(mes);
-  const futuro = meta.data_base && data > meta.data_base;
-  $("#mes-rotulo").innerHTML = `<b>${rotuloMes(mes)}</b><br><small>${futuro ? "projeção" : "situação"} em ${fmtData(data)}</small>`;
+  mostrarRotuloMes();
   $("#resumo").classList.add("carregando");
   clearTimeout(espera);
   espera = window.setTimeout(() => void atualizar(), 200);

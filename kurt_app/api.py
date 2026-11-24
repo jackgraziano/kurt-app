@@ -7,6 +7,8 @@ eventos). Os cenários ficam em arquivos JSON na pasta de cenários.
 from __future__ import annotations
 
 import os
+from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -19,10 +21,23 @@ from . import __version__
 from .cadastro import Cadastro, CadastroErro
 from .cenario import BASE, CenarioErro, Cenarios
 from .esquema import ENTIDADES, TABELAS
+from .importar import eventos_de_linhas, eventos_de_usinas
+from .layout import CENTRO_UF, contornos_uf
 from .validar import relatorio, validar
 
 RAIZ = Path(__file__).resolve().parent.parent
 FRONT = RAIZ / "frontend" / "dist"
+
+
+@contextmanager
+def _erros(nao_existe: str, prefixo: str = "") -> Iterator[None]:
+    """Traduz os erros do domínio em respostas HTTP: inexistente → 404, inválido → 422."""
+    try:
+        yield
+    except (KeyError, FileNotFoundError):
+        raise HTTPException(404, nao_existe) from None
+    except (CenarioErro, ValueError) as e:
+        raise HTTPException(422, f"{prefixo}{e}") from None
 
 
 def criar_app(pasta_cadastro: str | Path | None = None, pasta_cenarios: str | Path | None = None) -> FastAPI:
@@ -38,12 +53,8 @@ def criar_app(pasta_cadastro: str | Path | None = None, pasta_cenarios: str | Pa
     app.state.cenarios = cenarios
 
     def cad(nome: str | None) -> Cadastro:
-        try:
+        with _erros(f"cenário {nome} não existe", f"cenário {nome} não se aplica: "):
             return cenarios.cadastro(nome or BASE)
-        except KeyError:
-            raise HTTPException(404, f"cenário {nome} não existe")
-        except CenarioErro as e:
-            raise HTTPException(422, f"cenário {nome} não se aplica: {e}")
 
     # -- consultas ----------------------------------------------------------
     @app.get("/api/meta")
@@ -80,10 +91,9 @@ def criar_app(pasta_cadastro: str | Path | None = None, pasta_cenarios: str | Pa
     def entidade(tipo: str, ident: str, cenario: str | None = None):
         if tipo not in ENTIDADES:
             raise HTTPException(404, f"tipo desconhecido: {tipo}")
-        try:
-            return cad(cenario).entidade(tipo, ident)
-        except KeyError:
-            raise HTTPException(404, f"{tipo} {ident} não encontrada")
+        c = cad(cenario)
+        with _erros(f"{tipo} {ident} não encontrada"):
+            return c.entidade(tipo, ident)
 
     @app.get("/api/diferenca")
     def diferenca(a: str, b: str, cenario: str | None = None):
@@ -116,72 +126,46 @@ def criar_app(pasta_cadastro: str | Path | None = None, pasta_cenarios: str | Pa
 
     @app.post("/api/cenarios", status_code=201)
     def criar(dados: dict[str, Any] = Body(...)):
-        try:
+        with _erros(f"cenário pai {dados.get('pai')} não existe"):
             return cenarios.criar(
                 dados.get("nome", ""), dados.get("descricao", ""), dados.get("pai"), dados.get("horizonte")
             )
-        except KeyError as e:
-            raise HTTPException(404, f"cenário pai {e} não existe")
-        except CenarioErro as e:
-            raise HTTPException(422, str(e))
 
     @app.get("/api/cenarios/{nome}")
     def ler(nome: str):
-        try:
+        with _erros(f"cenário {nome} não existe"):
             cadeia = cenarios.cadeia(nome)
-        except KeyError:
-            raise HTTPException(404, f"cenário {nome} não existe")
-        except CenarioErro as e:
-            raise HTTPException(422, str(e))
         proprio = cadeia[-1]
         herdados = [dict(e, cenario=c["nome"]) for c in cadeia[:-1] for e in c.get("eventos", [])]
         return {**proprio, "herdados": herdados, "cadeia": [c["nome"] for c in cadeia]}
 
     @app.delete("/api/cenarios/{nome}", status_code=204)
     def apagar(nome: str):
-        try:
+        with _erros(f"cenário {nome} não existe"):
             cenarios.apagar(nome)
-        except FileNotFoundError:
-            raise HTTPException(404, f"cenário {nome} não existe")
-        except CenarioErro as e:
-            raise HTTPException(422, str(e))
 
     @app.post("/api/cenarios/{nome}/eventos", status_code=201)
     def adicionar(nome: str, eventos: list[dict[str, Any]] | dict[str, Any] = Body(...)):
         lista = eventos if isinstance(eventos, list) else [eventos]
-        try:
+        with _erros(f"cenário {nome} não existe"):
             return cenarios.adicionar_eventos(nome, lista)
-        except KeyError:
-            raise HTTPException(404, f"cenário {nome} não existe")
-        except CenarioErro as e:
-            raise HTTPException(422, str(e))
 
     @app.delete("/api/cenarios/{nome}/eventos/{evento_id}", status_code=204)
     def remover(nome: str, evento_id: str):
-        try:
+        with _erros(f"evento {evento_id} não existe em {nome}", "não dá para remover: "):
             cenarios.remover_evento(nome, evento_id)
-        except KeyError:
-            raise HTTPException(404, f"evento {evento_id} não existe em {nome}")
-        except CenarioErro as e:
-            raise HTTPException(422, f"não dá para remover: {e}")
 
     @app.post("/api/cenarios/{nome}/importar", status_code=201)
-    def importar(nome: str, tipo: str = Query(..., pattern="^(linhas|usinas)$"), texto: str = Body(..., media_type="text/plain")):
-        from .importar import eventos_de_linhas, eventos_de_usinas
-
-        try:
+    def importar(
+        nome: str, tipo: str = Query(..., pattern="^(linhas|usinas)$"), texto: str = Body(..., media_type="text/plain")
+    ):
+        with _erros(f"cenário {nome} não existe"):
             evs = eventos_de_linhas(texto) if tipo == "linhas" else eventos_de_usinas(texto)
             return cenarios.adicionar_eventos(nome, evs)
-        except KeyError:
-            raise HTTPException(404, f"cenário {nome} não existe")
-        except (CenarioErro, ValueError) as e:
-            raise HTTPException(422, str(e))
 
     @app.get("/api/ufs")
     def ufs():
         """Contorno simplificado das UFs e o centro usado no layout, para o fundo do mapa."""
-        from .layout import CENTRO_UF, contornos_uf
-
         return {
             uf: {"aneis": [a.tolist() for a in aneis], "centro": CENTRO_UF.get(uf)}
             for uf, aneis in contornos_uf().items()
@@ -190,8 +174,7 @@ def criar_app(pasta_cadastro: str | Path | None = None, pasta_cenarios: str | Pa
     @app.get("/api/esquema")
     def esquema():
         return {
-            n: {"chave": t.chave, "colunas": t.nomes, "obrigatorias": list(t.obrigatorias)}
-            for n, t in TABELAS.items()
+            n: {"chave": t.chave, "colunas": t.nomes, "obrigatorias": list(t.obrigatorias)} for n, t in TABELAS.items()
         }
 
     if FRONT.is_dir():
@@ -208,7 +191,7 @@ def _data_valida(s: str) -> None:
     try:
         date.fromisoformat(s)
     except ValueError:
-        raise HTTPException(422, f"data inválida: {s} (use AAAA-MM-DD)")
+        raise HTTPException(422, f"data inválida: {s} (use AAAA-MM-DD)") from None
 
 
-__all__ = ["criar_app", "CadastroErro"]
+__all__ = ["CadastroErro", "criar_app"]
