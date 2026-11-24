@@ -199,8 +199,12 @@ class Simulacoes:
             return self._gravar(s)
 
     def apagar(self, nome: str) -> None:
+        """Apaga o cenário e os casos de rede que eram só dele (importados de JSON)."""
         with self._trava:
             arq = self._arq(nome)
             if not arq.exists():
                 raise KeyError(nome)
             arq.unlink()
+        for caso in self.casos_rede.listar():
+            if caso.get("simulacao") == nome and not self.usam_caso(caso["nome"]):
+                self.casos_rede.apagar(caso["nome"])

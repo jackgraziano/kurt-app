@@ -136,12 +136,21 @@ async function telaCenario(nome: string, aba: string): Promise<void> {
   $("#trilha").innerHTML = `/ <b>${esc(s.nome)}</b> <span class="sub">${horizonte(s)}</span>`;
   const abas = [{ id: ABA_RESUMO, rotulo: "Resumo", disponivel: true }, ...insumos];
   if (!abas.some((a) => a.id === aba)) aba = ABA_RESUMO;
-  $("#abas-cenario").innerHTML = abas
-    .map(
-      (a) =>
-        `<a href="#/c/${esc(s.nome)}/${a.id}" class="${a.id === aba ? "ativa" : ""} ${a.disponivel ? "" : "esqueleto"}">${esc(a.rotulo)}</a>`,
-    )
-    .join("");
+  const comJson = aba !== ABA_RESUMO && insumos.some((i) => i.id === aba && i.disponivel);
+  $("#abas-cenario").innerHTML =
+    abas
+      .map(
+        (a) =>
+          `<a href="#/c/${esc(s.nome)}/${a.id}" class="${a.id === aba ? "ativa" : ""} ${a.disponivel ? "" : "esqueleto"}">${esc(a.rotulo)}</a>`,
+      )
+      .join("") +
+    (comJson
+      ? `<span class="acoes-json" title="Todos os insumos desta aba num JSON: baixe, edite à mão e suba de volta">
+          <a href="${api.urlInsumo(s.nome, aba)}" download>baixar JSON</a>
+          <label>subir JSON<input type="file" accept=".json,application/json" id="subir-json" hidden /></label>
+        </span>`
+      : "");
+  if (comJson) ligarSubirJson(s.nome, aba);
 
   const conteudo = $("#conteudo-cenario");
   const telaRede = $("#tela-rede");
@@ -156,6 +165,34 @@ async function telaCenario(nome: string, aba: string): Promise<void> {
     <p class="vazio">Esta aba ainda não tem configuração. Quando tiver, a escolha feita aqui fica guardada no cenário
     <b>${esc(s.nome)}</b>, para o horizonte ${horizonte(s)}.</p>
   </div>`;
+}
+
+function ligarSubirJson(nome: string, aba: string): void {
+  const input = $<HTMLInputElement>("#subir-json");
+  input.addEventListener("change", async () => {
+    const arq = input.files?.[0];
+    input.value = "";
+    if (!arq) return;
+    let doc: unknown;
+    try {
+      doc = JSON.parse(await arq.text());
+    } catch (err) {
+      aviso(`${arq.name} não é um JSON válido: ${err}`, true);
+      return;
+    }
+    try {
+      const s = await api.subirInsumo(nome, aba, doc);
+      redeAberta = ""; // força recarregar a aba com o que subiu
+      aviso(
+        aba === "rede"
+          ? `${arq.name} aplicado: o cenário agora usa o caso de rede ${casoRede(s)}`
+          : `${arq.name} aplicado à aba ${aba}`,
+      );
+      await rotear();
+    } catch (err) {
+      aviso(String(err), true);
+    }
+  });
 }
 
 async function abrirAbaRede(s: Simulacao): Promise<void> {

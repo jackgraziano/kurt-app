@@ -49,6 +49,10 @@ export const api = {
   atualizarSimulacao: (nome: string, mudancas: Partial<Pick<Simulacao, "descricao" | "inicio" | "fim" | "insumos">>) =>
     pedir<Simulacao>("PATCH", `/api/simulacoes/${nome}`, {}, mudancas),
   apagarSimulacao: (nome: string) => pedir<null>("DELETE", `/api/simulacoes/${nome}`),
+  // JSON de cada aba de insumo: baixar (link direto) e subir de volta
+  urlInsumo: (nome: string, aba: string) => `/api/simulacoes/${encodeURIComponent(nome)}/insumos/${aba}?baixar=1`,
+  subirInsumo: (nome: string, aba: string, doc: unknown) =>
+    pedir<Simulacao>("POST", `/api/simulacoes/${encodeURIComponent(nome)}/insumos/${aba}`, {}, doc),
 
   // casos de rede (camadas de eventos sobre o caso base; a API ainda os chama de cenários)
   cenarios: () => get<CenarioResumo[]>("/api/cenarios"),

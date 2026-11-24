@@ -249,6 +249,7 @@ class Cenarios:
                     "horizonte": d.get("horizonte"),
                     "n_eventos": len(d.get("eventos", [])),
                     "editavel": True,
+                    "simulacao": d.get("simulacao"),
                 }
             )
         return out
@@ -299,41 +300,87 @@ class Cenarios:
             self._arq(nome).unlink(missing_ok=False)
             self._cache.pop(nome, None)
 
+    @staticmethod
+    def _preparar(nome: str, novos: list[dict], ids: set[str]) -> list[dict]:
+        """Completa e confere eventos novos: fonte, confiança, data e um id único."""
+        prontos = []
+        for ev in novos:
+            ev = dict(ev)
+            ev.setdefault("fonte", "usuario")
+            ev.setdefault("confianca", "previsto")
+            if ev.get("acao") not in ACOES:
+                raise CenarioErro(f"ação inválida: {ev.get('acao')!r}")
+            ev["data"] = _d(ev.get("data")).isoformat()
+            if not ev.get("evento_id"):
+                k = len(ids) + 1
+                while f"{nome}-{k}" in ids:
+                    k += 1
+                ev["evento_id"] = f"{nome}-{k}"
+            if ev["evento_id"] in ids:
+                raise CenarioErro(f"evento {ev['evento_id']} repetido")
+            ids.add(ev["evento_id"])
+            prontos.append(ev)
+        return prontos
+
+    @staticmethod
+    def _fixar_ids_entra(prontos: list[dict], normalizados: list[dict]) -> None:
+        """Grava no arquivo os ids gerados para 'entra', para que fiquem estáveis."""
+        por_id = {e["evento_id"]: e for e in normalizados if e.get("evento_id")}
+        for ev in prontos:
+            if ev["acao"] == "entra" and not ev.get("entidade_id"):
+                ev["entidade_id"] = por_id[ev["evento_id"]]["entidade_id"]
+                tab = TABELAS[ev["entidade"]]
+                ev.setdefault("registro", {})[tab.chave] = ev["entidade_id"]
+
     def adicionar_eventos(self, nome: str, novos: list[dict]) -> list[dict]:
         """Valida aplicando o cenário inteiro; só grava se tudo se aplicar."""
         with self._lock:
             dados = self.ler(nome)
             ids = {e["evento_id"] for c in self.cadeia(nome) for e in c.get("eventos", [])}
-            prontos = []
-            for ev in novos:
-                ev = dict(ev)
-                ev.setdefault("fonte", "usuario")
-                ev.setdefault("confianca", "previsto")
-                if ev.get("acao") not in ACOES:
-                    raise CenarioErro(f"ação inválida: {ev.get('acao')!r}")
-                ev["data"] = _d(ev.get("data")).isoformat()
-                if not ev.get("evento_id"):
-                    k = len(ids) + 1
-                    while f"{nome}-{k}" in ids:
-                        k += 1
-                    ev["evento_id"] = f"{nome}-{k}"
-                if ev["evento_id"] in ids:
-                    raise CenarioErro(f"evento {ev['evento_id']} já existe")
-                ids.add(ev["evento_id"])
-                prontos.append(ev)
+            prontos = self._preparar(nome, novos, ids)
             candidato = {**dados, "eventos": dados.get("eventos", []) + prontos}
-            # resolve ids automáticos de 'entra' para que fiquem estáveis no arquivo
             todos = [e for c in self.cadeia(nome)[:-1] for e in c.get("eventos", [])] + candidato["eventos"]
             _, normalizados = aplicar(self.base, todos)
-            por_id = {e["evento_id"]: e for e in normalizados if e.get("evento_id")}
-            for ev in prontos:
-                if ev["acao"] == "entra" and not ev.get("entidade_id"):
-                    ev["entidade_id"] = por_id[ev["evento_id"]]["entidade_id"]
-                    tab = TABELAS[ev["entidade"]]
-                    ev.setdefault("registro", {})[tab.chave] = ev["entidade_id"]
+            self._fixar_ids_entra(prontos, normalizados)
             self._gravar(candidato)
             self._cache.pop(nome, None)
             return prontos
+
+    def substituir(
+        self, nome: str, eventos: list[dict], descricao: str = "", horizonte: str | None = None, dono: str | None = None
+    ) -> dict:
+        """Grava um caso de rede inteiro (sem pai) com estes eventos, depois de validá-los.
+
+        Usado pela importação do JSON da aba Rede: o caso pertence a um cenário
+        de simulação (``dono``) e só pode ser sobrescrito pelo mesmo dono.
+        """
+        with self._lock:
+            arq = self._arq(nome)
+            if nome == BASE:
+                raise CenarioErro("o caso base não pode ser substituído")
+            if arq.exists():
+                if self.ler(nome).get("simulacao") != dono:
+                    raise CenarioErro(f"já existe um caso de rede {nome} que não pertence a este cenário")
+                filhos = [c["nome"] for c in self.listar() if c.get("pai") == nome]
+                if filhos:
+                    raise CenarioErro(f"o caso de rede {nome} é pai de {filhos}")
+            if horizonte:
+                _d(horizonte)
+            prontos = self._preparar(nome, eventos, set())
+            _, normalizados = aplicar(self.base, prontos)
+            self._fixar_ids_entra(prontos, normalizados)
+            dados = {
+                "nome": nome,
+                "descricao": descricao,
+                "pai": None,
+                "horizonte": horizonte or self._horizonte_padrao(),
+                "eventos": prontos,
+            }
+            if dono:
+                dados["simulacao"] = dono
+            self._gravar(dados)
+            self._cache.pop(nome, None)
+            return dados
 
     def remover_evento(self, nome: str, evento_id: str) -> None:
         with self._lock:

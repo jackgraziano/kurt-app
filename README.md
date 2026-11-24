@@ -1,45 +1,59 @@
 # kurt-app
 
-Aplicação local para enxergar o sistema físico que o Kurt usa e, depois, rodar projeções de curtailment sobre ele.
+Aplicação local para montar cenários de simulação do Kurt e projetar curtailment: o sistema físico (rede, usinas, restrições) ao longo do tempo e, aba por aba, os demais insumos de uma rodada.
 
 Roda na máquina Linux, junto com os decks e o binário do Kurt. Não tem login, nuvem nem deploy.
 
-## O que já faz (v0.1)
+Para quem vai continuar o desenvolvimento (pessoas ou agentes), as diretrizes estão em [AGENTS.md](AGENTS.md).
 
-- **Cadastro do sistema físico:** cinco tabelas em Parquet (`barras`, `ramos`, `usinas`, `restricoes`, `eventos`), cada registro com vigência `[vigente_de, vigente_ate)`. Qualquer data é um recorte. O esquema está em `kurt_app/esquema.py`.
-- **API local** (FastAPI + DuckDB):
-  - `GET /api/meta`: período, meses com eventos, contagens;
-  - `GET /api/configuracao?data=AAAA-MM-DD&kv_min=&submercado=`: o sistema vigente na data;
-  - `GET /api/eventos?de=&ate=&entidade=&confianca=`;
-  - `GET /api/entidade/{barras|ramos|usinas|restricoes}/{id}`: versões e eventos de uma entidade;
-  - `GET /api/diferenca?a=&b=`: o que entrou, saiu ou mudou entre duas datas;
-  - `GET /api/validacao`: checagens de qualidade.
-- **Mapa indicativo com linha do tempo:** subestações, ramos e usinas sobre o contorno das UFs, mês a mês, com comparação entre duas datas, ficha de cada elemento e a lista de eventos do mês. No play ou ao arrastar a linha do tempo, o que entrou (verde), mudou (roxo) ou saiu (vermelho) no mês pisca no mapa. As posições são aproximadas de propósito: cada subestação parte do centro da UF e um layout de molas a afasta das vizinhas, sem sair da UF.
-- **Checagens:** versões sobrepostas, domínios, JSON, referências a barras inexistentes, barras com usina ou carga isoladas e ilhas na rede.
+## Como funciona
+
+```
+caso base (Parquet, extraído do deck)  ──►  casos de rede (camadas de eventos datados)
+                                                      │
+cenário de simulação: horizonte + um insumo por aba ◄─┘  rede · carga · renováveis · hidro ·
+                                                          valor da água · térmicas · execução
+```
+
+- **Caso base:** o cadastro do sistema físico extraído do deck DESSEM mais recente por `kurt config extrair`. São cinco tabelas em Parquet (`barras`, `ramos`, `usinas`, `restricoes`, `eventos`), cada registro com vigência `[vigente_de, vigente_ate)`. Nunca é alterado.
+- **Casos de rede:** camadas de eventos datados sobre o caso base (`entra`, `sai`, `altera`), empilháveis. Ex.: `expansao` (obras e usinas previstas pela ANEEL) e, por cima, uma sensibilidade "LT X atrasa seis meses".
+- **Cenários de simulação:** o que uma rodada do Kurt vai usar. Cada um tem nome, horizonte (mês de início e de fim) e, para cada aba, a escolha do insumo. A aba Rede elétrica aponta para um caso de rede.
+- **JSON de cada aba:** toda aba de insumo tem um JSON por trás, que pode ser baixado, editado à mão e subido de volta (botões "baixar JSON" e "subir JSON" na barra de abas). O app valida e grava. Hoje isso funciona na Rede elétrica; as próximas abas seguem o mesmo contrato (ver AGENTS.md).
 
 ## Telas
 
-- **Tela principal** (`#/`): lista os cenários de simulação e cria um novo, escolhendo nome, horizonte (mês de início e de fim) e caso de rede.
-- **Tela do cenário** (`#/c/<nome>/<aba>`): uma aba por insumo da simulação. **Resumo** edita o horizonte e mostra o estado de cada insumo; **Rede elétrica** é o mapa com a linha do tempo, limitada ao horizonte do cenário, e o editor de casos de rede; **Carga**, **Renováveis**, **Hidro**, **Valor da água** (FCF), **Térmicas** e **Execução** (dias, discretização, cenários, saídas e opções do PL) ainda são esqueleto.
+- **Tela principal** (`#/`): lista os cenários e cria um novo, com nome, horizonte e caso de rede. O horizonte padrão são os 12 meses seguintes ao caso base.
+- **Tela do cenário** (`#/c/<nome>/<aba>`):
+  - **Resumo:** descrição, horizonte, caso de rede e o estado de cada insumo (definido, a definir, a fazer).
+  - **Rede elétrica:** mapa indicativo sobre o contorno das UFs, com a linha do tempo limitada ao horizonte. No play ou ao arrastar, o que entrou (verde), mudou (roxo) ou saiu (vermelho) no mês pisca no mapa. Barra lateral com os eventos do mês, o editor do caso de rede (linha nova, usina nova, importar CSV, remover evento), a ficha de cada elemento (alterar ou retirar numa data), a validação e informações do cadastro.
+  - **Carga, Renováveis, Hidro, Valor da água, Térmicas e Execução:** ainda são esqueleto.
 
-Cada cenário de simulação é um JSON em `dados/simulacoes/<cadastro>/<nome>.json` (ou `KURT_APP_SIMULACOES`), com o horizonte e a escolha de cada aba (`kurt_app/simulacao.py`). API: `GET /api/insumos`, `GET/POST /api/simulacoes`, `GET/PATCH/DELETE /api/simulacoes/{nome}`. Um caso de rede usado por algum cenário não pode ser apagado.
+As posições no mapa são indicativas de propósito: cada subestação parte do centro da sua UF e um layout de molas a afasta das vizinhas, sem sair da UF. Não é geografia exata.
 
-## Casos de rede: o caso base projetado
+## JSON da aba Rede elétrica
 
-> Na API e no código, os casos de rede ainda se chamam `cenarios` (`/api/cenarios`, `kurt_app/cenario.py`); no app, "cenário" é o cenário de simulação.
+```json
+{
+  "formato": "kurt-app/insumo", "versao": 1, "insumo": "rede", "cenario": "dez26-expansao",
+  "horizonte": {"inicio": "2026-12-01", "fim": "2027-11-30"},
+  "_ajuda": ["..."],
+  "dados": {
+    "caso_de_origem": "expansao",
+    "caso_base": {"deck": "...", "data_base": "2026-11-20"},
+    "eventos": [
+      {"data": "2027-04-01", "acao": "entra", "entidade": "ramos", "entidade_id": "R5350-5428-N1",
+       "registro": {"de": "B5350", "para": "B5428", "tipo": "linha", "cap_normal_mva": 2000},
+       "fonte": "ANEEL SIGET", "confianca": "contratado", "camada": "expansao"},
+      {"data": "2027-06-01", "acao": "altera", "entidade": "ramos", "entidade_id": "R5350-5428-1",
+       "campos": {"cap_normal_mva": 2400}}
+    ]
+  }
+}
+```
 
+`eventos` é a lista completa de mudanças sobre o caso base: todas as camadas do caso de rede, achatadas. Ao subir o arquivo, a lista é validada contra o caso base e gravada como o caso de rede `<cenário>-rede`, que pertence só àquele cenário. O cenário passa a usá-lo, e os casos de rede compartilhados não mudam. Se algum evento não se aplica, por exemplo uma barra inexistente na data ou um ramo que não está vigente, nada é gravado e o erro diz qual evento falhou.
 
-O cadastro extraído do deck mais recente é o **caso base** e nunca é alterado. Um cenário é uma camada de eventos datados aplicada sobre ele (ou sobre outro cenário, o pai), em memória:
-
-- `entra`: um ramo, uma usina ou uma barra nova a partir de uma data;
-- `sai`: um elemento deixa de existir numa data;
-- `altera`: muda campos (capacidade, `x_pct`, `cap_mw`...) a partir de uma data.
-
-Cada evento leva `fonte` e `confianca` (`realizado`, `contratado`, `previsto`, `especulativo`). O mapa desenha tracejado o que não é realizado. A linha do tempo vai até o horizonte do cenário (padrão: caso base + 5 anos); depois da data do caso base os meses aparecem como "projeção".
-
-Os eventos são validados ao entrar: barras referenciadas precisam existir na data, ids não podem repetir, e remover um evento do qual outro depende é recusado. Cada cenário é um JSON em `dados/cenarios/<cadastro>/<nome>.json` (ou `KURT_APP_CENARIOS`), fácil de versionar ou trocar.
-
-Pelo app: aba **Cenário** (linha nova, usina nova, importar CSV, remover evento) e, na ficha de um elemento, "alterar" ou "retirar neste cenário". Pela linha de comando:
+## Casos de rede pela linha de comando e por CSV
 
 ```bash
 kurt-app cenario criar expansao --cadastro <pasta> --descricao "expansão oficial"
@@ -48,7 +62,7 @@ kurt-app cenario criar sens-lt --cadastro <pasta> --pai expansao
 kurt-app cenario listar --cadastro <pasta>
 ```
 
-Formatos de CSV (cabeçalho obrigatório; barras pelo número do deck):
+O cabeçalho é obrigatório e as barras vão pelo número do deck:
 
 ```
 data,de,para,tipo,circuitos,x_pct,cap_normal_mva,nome,fonte,confianca,nota
@@ -58,68 +72,105 @@ data,nome,fonte_energia,barra,cap_mw,flag_corte,fonte,confianca,nota
 2027-08-01,UFV Exemplo,UFV,6140,800,1,ANEEL,previsto,
 ```
 
-`circuitos` > 1 gera um ramo por circuito. Na API: `GET/POST /api/cenarios`, `POST /api/cenarios/{nome}/eventos`, `DELETE /api/cenarios/{nome}/eventos/{id}`, `POST /api/cenarios/{nome}/importar?tipo=linhas|usinas`, e todas as consultas aceitam `?cenario=`.
+`circuitos` > 1 gera um ramo por circuito.
 
-### Cenário `expansao` a partir das fontes oficiais
+### Caso `expansao` a partir das fontes oficiais
 
-Dois scripts montam a expansão prevista sobre o caso base, com dados abertos da ANEEL:
-
-- `scripts/expansao_ralie.py`: usinas do RALIE (data prevista por unidade geradora e subestação de conexão), casadas com as barras do deck pelo nome da subestação, UF e tensão (`kurt_app/expansao.py`);
+- `scripts/expansao_ralie.py`: usinas do RALIE da ANEEL (data prevista por unidade geradora e subestação de conexão), casadas com as barras do deck por nome da subestação, UF e tensão (`kurt_app/expansao.py`). Use `--recriar` para refazer do zero.
 - `scripts/expansao_transmissao.py`: LTs, seccionamentos e transformações de 230 kV ou mais do SIGET (`kurt_app/transmissao.py`).
 
-O que não casa com segurança vai para CSVs de pendências ao lado do cenário (`expansao_pendencias.csv`, `transmissao_pendencias.csv`), com os melhores candidatos, para revisão. Use `--recriar` no primeiro script para refazer o cenário do zero.
+O que não casa com segurança vai para `expansao_pendencias.csv` e `transmissao_pendencias.csv`, ao lado dos casos de rede, com os melhores candidatos, para revisão.
+
+## API
+
+Todas as consultas de rede aceitam `?cenario=<caso de rede>` (padrão `base`).
+
+| Rota | O que faz |
+| --- | --- |
+| `GET /api/meta` | período, meses com eventos, contagens |
+| `GET /api/configuracao?data=&kv_min=&submercado=` | o sistema vigente na data |
+| `GET /api/eventos?de=&ate=&entidade=&confianca=` | eventos no período |
+| `GET /api/entidade/{tipo}/{id}` | versões e eventos de uma barra, ramo, usina ou restrição |
+| `GET /api/diferenca?a=&b=` | o que entrou, saiu ou mudou entre duas datas |
+| `GET /api/validacao` | checagens de qualidade |
+| `GET/POST /api/cenarios`, `GET/DELETE /api/cenarios/{nome}` | casos de rede |
+| `POST /api/cenarios/{nome}/eventos`, `DELETE .../eventos/{id}`, `POST .../importar?tipo=` | eventos de um caso de rede |
+| `GET /api/insumos` | as abas de insumo |
+| `GET/POST /api/simulacoes`, `GET/PATCH/DELETE /api/simulacoes/{nome}` | cenários de simulação |
+| `GET /api/simulacoes/{nome}/insumos/{aba}[?baixar=1]` | JSON da aba |
+| `POST /api/simulacoes/{nome}/insumos/{aba}` | sobe o JSON da aba |
+| `GET /api/ufs`, `GET /api/esquema` | contorno das UFs e esquema das tabelas |
 
 ## Como rodar
 
 ```bash
 make setup          # uma vez: .venv e node_modules
 make servir         # compila o front e sobe em http://127.0.0.1:8000
+make servir CADASTRO=dados/cadastro/base-20261120   # com o caso base do SIN
 ```
 
-Do Mac, abra pelo túnel: `ssh -L 8000:127.0.0.1:8000 <maquina-linux>` e acesse `http://localhost:8000`.
-`make servir-rede` abre na rede local (`0.0.0.0`). Como não há login, use só em rede confiável.
-
-Para outro cadastro: `make servir CADASTRO=/caminho/do/cadastro`.
-
-Sem `make` ou sem `python3-venv`: `uv venv && uv pip install -e '.[dev]'`, `npm --prefix frontend ci && npm --prefix frontend run build` e `.venv/bin/kurt-app servir --cadastro <pasta>`.
-Para desenvolver o front com recarga: `make dev` (Vite em `http://127.0.0.1:5173`).
+- **Do Mac:** abra pelo túnel `ssh -L 8000:127.0.0.1:8000 <maquina-linux>` e acesse `http://localhost:8000`. Também dá para usar `make servir-rede`, que abre na rede local (`0.0.0.0`); como não há login, use só em rede confiável.
+- **Sem `make` ou sem `python3-venv`:**
+  - `uv venv && uv pip install -e '.[dev]'`;
+  - `npm --prefix frontend ci && npm --prefix frontend run build`;
+  - `.venv/bin/kurt-app servir --cadastro <pasta>`.
 
 ```bash
-make test           # pytest + checagem de tipos do front
-make validar        # checagens do cadastro atual
+make dev            # backend com recarga + Vite em http://127.0.0.1:5173
+make test           # ruff (lint e formato), pytest e checagem de tipos do front
+make validar        # checagens do cadastro
 ```
+
+Dados locais, fora do git (`dados/`):
+
+| Pasta | Conteúdo | Variável |
+| --- | --- | --- |
+| `dados/cadastro/<nome>/` | casos base extraídos | `KURT_APP_CADASTRO` |
+| `dados/cenarios/<cadastro>/` | casos de rede, um JSON por caso | `KURT_APP_CENARIOS` |
+| `dados/simulacoes/<cadastro>/` | cenários de simulação, um JSON por cenário | `KURT_APP_SIMULACOES` |
 
 ## Fixture
 
-`fixtures/acu3_20260910/` é um recorte real, o eixo Açu III do deck DESSEM de 10/09/2026, gerado por `scripts/fixture_acu3.py`. Serve para desenvolver enquanto a extração completa não existe. Limitações:
+`fixtures/acu3_20260910/` é um recorte real: o eixo Açu III do deck DESSEM de 10/09/2026, gerado por `scripts/fixture_acu3.py`. É usado nos testes e para desenvolver sem o caso base do SIN. Tem algumas limitações:
 
-- `cap_mw` das usinas é aproximada pelo máximo da geração de referência do dia;
-- `carga_media_mw` é a média das 48 meias-horas, não a carga do caso base;
+- `cap_mw` é o máximo da geração de referência do dia;
 - `x_pct` não está no recorte;
-- os dois eventos com fonte `demo` (nomes com `[DEMO]`) são **hipotéticos** e só existem para testar a linha do tempo.
+- os eventos com fonte `demo` (nomes com `[DEMO]`) são hipotéticos.
 
 ## Divisão com o repositório do Kurt
 
 | Repositório | Responsabilidade |
 | --- | --- |
-| `kurt` | Ler e escrever decks: extração do cadastro a partir dos decks (`kurt config extrair`, a fazer) e gerador de decks a partir do cadastro e das séries (a fazer). |
-| `kurt-app` | Ler o cadastro, mostrar, montar cenários e disparar rodadas do Kurt pela linha de comando. Não conhece o formato do deck. |
+| `kurt` | Ler e escrever decks: `kurt config extrair <deck.zip> <saida>` gera o caso base; o gerador de decks a partir de um cenário ainda está por fazer. Roda o PL. |
+| `kurt-app` | Ler o cadastro, montar casos de rede e cenários de simulação, mostrar e, depois, disparar rodadas do Kurt pela linha de comando. Não conhece o formato do deck. |
 
-O contrato entre os dois é o esquema dos Parquet e os subcomandos do Kurt.
-
-## Próximos passos
-
-1. Revisar as pendências do cenário `expansao` (usinas sem ponto de conexão, casamentos ambíguos) e reconciliar os totais com NEWAVE/DECOMP.
-2. Merge de `kurt config extrair` (branch `feat/config-extrair` do Kurt) quando a fase 7 permitir.
-3. Rodadas do Kurt sobre um cenário, com resultados em P10, P50 e P90.
+O contrato entre os dois é o esquema dos Parquet (`kurt_app/esquema.py`) e os subcomandos do Kurt.
 
 ## Estrutura
 
 ```
-kurt_app/        backend: esquema, cadastro, cenários, validação, layout, API, CLI,
-                 importação da expansão (expansao.py, transmissao.py), ufs.json
-frontend/        TypeScript + Vite, sem framework; mapa em canvas
-fixtures/        cadastros de exemplo
-scripts/         fixture, malha das UFs, montagem do cenário expansao
-tests/           pytest (make test roda também ruff e a checagem de tipos)
+kurt_app/
+  esquema.py        contrato das tabelas do cadastro
+  cadastro.py       consultas por data (DuckDB)
+  cenario.py        casos de rede: eventos datados sobre o caso base
+  simulacao.py      cenários de simulação e a lista de abas (INSUMOS)
+  insumo_json.py    JSON de cada aba: exportar e importar
+  validar.py        checagens do cadastro
+  layout.py         posições indicativas (molas, dentro da UF); ufs.json
+  expansao.py, transmissao.py   expansão a partir do RALIE e do SIGET
+  importar.py       CSV de linhas e usinas
+  api.py, cli.py
+frontend/src/
+  main.ts           casca: rotas, tela principal, tela do cenário, abas
+  rede.ts           aba Rede elétrica (mapa, linha do tempo, editor)
+  mapa.ts           desenho em canvas
+  api.ts, tipos.ts, util.ts, estilo.css
+scripts/            fixture, malha das UFs, montagem do caso expansao
+tests/              pytest, só com a fixture e sem rede
 ```
+
+## Próximos passos
+
+1. Lógica das abas de insumo, cada uma com o seu JSON: Carga, Renováveis, Hidro, Valor da água, Térmicas e Execução.
+2. Revisar as pendências do caso `expansao`, como usinas sem ponto de conexão e casamentos ambíguos, e reconciliar os totais com NEWAVE/DECOMP.
+3. Gerador de deck a partir de um cenário (no Kurt) e rodadas pela aba Execução, com resultados em P10, P50 e P90.

@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import Body, FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__
@@ -23,6 +23,8 @@ from .cadastro import Cadastro, CadastroErro
 from .cenario import BASE, CenarioErro, Cenarios
 from .esquema import ENTIDADES, TABELAS
 from .importar import eventos_de_linhas, eventos_de_usinas
+from .insumo_json import exportar as exportar_insumo
+from .insumo_json import importar as importar_insumo
 from .layout import CENTRO_UF, contornos_uf
 from .simulacao import INSUMOS, Simulacoes
 from .validar import relatorio, validar
@@ -207,6 +209,19 @@ def criar_app(
     def atualizar_simulacao(nome: str, mudancas: dict[str, Any] = Body(...)):
         with _erros(f"cenário {nome} não existe"):
             return simulacoes.atualizar(nome, mudancas)
+
+    @app.get("/api/simulacoes/{nome}/insumos/{aba}")
+    def baixar_insumo(nome: str, aba: str, baixar: bool = False):
+        """JSON da aba, no envelope de insumo_json. Com ?baixar=1, vem como anexo."""
+        with _erros(f"cenário {nome} ou aba {aba} não existe"):
+            doc = exportar_insumo(simulacoes, nome, aba)
+        cab = {"Content-Disposition": f'attachment; filename="{nome}-{aba}.json"'} if baixar else {}
+        return JSONResponse(doc, headers=cab)
+
+    @app.post("/api/simulacoes/{nome}/insumos/{aba}")
+    def subir_insumo(nome: str, aba: str, doc: dict[str, Any] = Body(...)):
+        with _erros(f"cenário {nome} ou aba {aba} não existe"):
+            return importar_insumo(simulacoes, nome, aba, doc)
 
     @app.delete("/api/simulacoes/{nome}", status_code=204)
     def apagar_simulacao(nome: str):
