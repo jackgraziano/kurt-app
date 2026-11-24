@@ -46,6 +46,17 @@ interface PontoUsina {
   estado: Estado;
 }
 
+// destaque animado do que mudou no mês: anel que se expande (ponto) ou brilho (linha)
+interface Pulso {
+  x: number;
+  y: number;
+  x2?: number; // presente quando é um ramo
+  y2?: number;
+  cor: string;
+  t0: number;
+}
+const DURACAO_PULSO = 2200; // ms; dois ciclos
+
 export const COR_FONTE: Record<string, string> = {
   EOL: "#1a9e8f",
   UFV: "#e0a106",
@@ -85,6 +96,8 @@ export class Mapa {
   private cy = 0;
   private arrastando: { x: number; y: number; cx: number; cy: number; moveu: boolean } | null = null;
   private ajustado = false;
+  private pulsos: Pulso[] = [];
+  private quadro: number | null = null;
   private ufs: { uf: string; aneis: [number, number][][]; centro: [number, number] | null }[] = [];
   onClique: (alvo: Alvo | null) => void = () => {};
   onPasso: (alvo: Alvo | null, x: number, y: number) => void = () => {};
@@ -119,7 +132,13 @@ export class Mapa {
     });
   }
 
-  carregar(cena: Cena): void {
+  /**
+   * pulsar: destaca o que mudou em relação à cena anterior (meses consecutivos).
+   * Entradas e alterações vêm de cena.estado; saídas são os ramos e usinas que
+   * estavam na cena anterior e sumiram, desenhados na posição antiga.
+   */
+  carregar(cena: Cena, pulsar = false): void {
+    const antes = pulsar ? { arestas: this.arestas, pontos: this.pontos } : null;
     const est = (id: string) => cena.estado.get(id) ?? "normal";
     const porSub = new Map<string, No>();
     const subDaBarra = new Map<string, No>();
@@ -182,11 +201,87 @@ export class Mapa {
         });
       });
     }
+    if (antes) this.criarPulsos(antes, subDaBarra, cena, est);
     if (!this.ajustado && this.nos.length) {
       this.ajustar();
       this.ajustado = true;
     }
     this.desenhar();
+  }
+
+  private criarPulsos(
+    antes: { arestas: Aresta[]; pontos: PontoUsina[] },
+    subDaBarra: Map<string, No>,
+    cena: Cena,
+    est: (id: string) => Estado,
+  ): void {
+    const t0 = performance.now();
+    const novos: Pulso[] = [];
+    const ponto = (x: number, y: number, e: Estado) => novos.push({ x, y, cor: COR_ESTADO[e], t0 });
+    for (const a of this.arestas)
+      if (a.estado !== "normal") novos.push({ x: a.a.x, y: a.a.y, x2: a.b.x, y2: a.b.y, cor: COR_ESTADO[a.estado], t0 });
+    for (const p of this.pontos) if (p.estado !== "normal") ponto(p.x, p.y, p.estado);
+    for (const n of this.nos) if (n.estado !== "normal") ponto(n.x, n.y, n.estado);
+    // trafo novo dentro da subestação não vira aresta: pulsa a subestação
+    for (const r of cena.ramos) {
+      const e = est(r.ramo_id);
+      const a = subDaBarra.get(r.de);
+      if (e !== "normal" && a && a === subDaBarra.get(r.para)) ponto(a.x, a.y, e);
+    }
+    // o que sumiu desde a cena anterior
+    const ramosAgora = new Set(cena.ramos.map((r) => r.ramo_id));
+    const usinasAgora = new Set(cena.usinas.map((u) => u.usina_id));
+    for (const a of antes.arestas)
+      if (a.ramos.some((r) => !ramosAgora.has(r.ramo_id)))
+        novos.push({ x: a.a.x, y: a.a.y, x2: a.b.x, y2: a.b.y, cor: COR_ESTADO.saiu, t0 });
+    for (const p of antes.pontos) if (!usinasAgora.has(p.u.usina_id)) ponto(p.x, p.y, "saiu");
+    if (novos.length > 3000) novos.length = 3000; // proteção: mudança de filtro em massa
+    this.pulsos.push(...novos);
+    if (this.pulsos.length && this.quadro === null) this.quadro = requestAnimationFrame(() => this.animar());
+  }
+
+  private animar(): void {
+    const agora = performance.now();
+    this.pulsos = this.pulsos.filter((p) => agora - p.t0 < DURACAO_PULSO);
+    this.desenhar();
+    this.quadro = this.pulsos.length ? requestAnimationFrame(() => this.animar()) : null;
+  }
+
+  private desenharPulsos(): void {
+    if (!this.pulsos.length) return;
+    const g = this.ctx;
+    const agora = performance.now();
+    g.save();
+    g.lineCap = "round";
+    for (const p of this.pulsos) {
+      const f = Math.min((agora - p.t0) / DURACAO_PULSO, 1);
+      const ciclo = (f * 2) % 1; // 0→1 duas vezes
+      const alfa = (1 - ciclo) * (1 - f * 0.5);
+      g.strokeStyle = p.cor;
+      g.globalAlpha = alfa;
+      const [x, y] = this.tela(p.x, p.y);
+      if (p.x2 !== undefined && p.y2 !== undefined) {
+        const [x2, y2] = this.tela(p.x2, p.y2);
+        g.lineWidth = 5 + 14 * ciclo;
+        g.globalAlpha = alfa * 0.7;
+        g.beginPath();
+        g.moveTo(x, y);
+        g.lineTo(x2, y2);
+        g.stroke();
+        // anel no meio, para o ramo aparecer também com o mapa afastado
+        g.lineWidth = 2.5;
+        g.globalAlpha = alfa;
+        g.beginPath();
+        g.arc((x + x2) / 2, (y + y2) / 2, 5 + 22 * ciclo, 0, 2 * Math.PI);
+        g.stroke();
+      } else {
+        g.lineWidth = 2.5;
+        g.beginPath();
+        g.arc(x, y, 5 + 22 * ciclo, 0, 2 * Math.PI);
+        g.stroke();
+      }
+    }
+    g.restore();
   }
 
   ajustar(): void {
@@ -335,6 +430,8 @@ export class Mapa {
       g.strokeStyle = n.estado !== "normal" ? COR_ESTADO[n.estado] : corKv(n.kv);
       g.stroke();
     }
+
+    this.desenharPulsos();
 
     // rótulos
     if (this.escala > 90) {

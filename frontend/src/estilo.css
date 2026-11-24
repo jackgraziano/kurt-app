@@ -17,7 +17,7 @@ button:hover { background: #f0f2f5; }
 .marca-mes { position: absolute; bottom: 0; width: 0; }
 .marca-mes i { position: absolute; bottom: 0; left: -3px; width: 6px; border-radius: 2px; background: #2e9d4b; }
 .marca-mes i.previsto { background: transparent; border: 1.5px dashed #2e9d4b; }
-.marca-mes .ano { position: absolute; top: 26px; left: -14px; font-size: 10px; color: #889; }
+.marca-mes .ano { position: absolute; top: 9px; left: -12px; font-size: 10px; color: #889; }
 #mes { position: absolute; left: 0; right: 0; bottom: 6px; width: 100%; margin: 0; }
 #mes-rotulo { min-width: 120px; text-align: right; }
 #mes-rotulo b { font-size: 16px; }

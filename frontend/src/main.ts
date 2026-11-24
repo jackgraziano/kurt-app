@@ -165,13 +165,19 @@ async function atualizar(): Promise<void> {
       for (const e of evs) if (e.acao === "entra") estado.set(e.entidade_id, "novo");
       for (const e of evs) if (e.acao === "altera") estado.set(e.entidade_id, "mudou");
     }
-    mapa.carregar(cena);
+    // pulsa o que mudou quando só o mês avançou ou recuou um passo (play ou arrastar a linha do tempo)
+    const filtros = `${cenario}|${kv}|${sub}|${semMmgd}`;
+    const pulsar = !cmp && ultimo !== null && ultimo.filtros === filtros && ultimo.mes !== mes;
+    ultimo = { mes, filtros };
+    mapa.carregar(cena, pulsar);
     mostrarEventos(evs, mes);
     mostrarResumo(cfg, cmp ? cmp[1] : null, mesCmp);
   } catch (err) {
     aviso(String(err), true);
   }
 }
+
+let ultimo: { mes: string; filtros: string } | null = null;
 
 function marcarDiferenca(cena: Cena, cfgA: Configuracao, dif: Diferenca): void {
   const pega = (t: string) => dif[t] as { entraram: string[]; sairam: string[]; alterados: { id: string }[] };
