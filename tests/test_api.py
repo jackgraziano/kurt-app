@@ -9,8 +9,8 @@ FIXTURE = Path(__file__).resolve().parent.parent / "fixtures" / "acu3_20260910"
 
 
 @pytest.fixture(scope="module")
-def cli():
-    return TestClient(criar_app(FIXTURE))
+def cli(tmp_path_factory):
+    return TestClient(criar_app(FIXTURE, tmp_path_factory.mktemp("cen")))
 
 
 def test_meta(cli):

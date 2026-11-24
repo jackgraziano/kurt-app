@@ -36,7 +36,7 @@ def _semente(nome: str) -> float:
 def posicoes(
     subestacoes: dict[str, str | None],
     arestas: list[tuple[str, str]],
-    iteracoes: int = 400,
+    iteracoes: int | None = None,
     raio_uf: float = 0.9,
 ) -> dict[str, tuple[float, float]]:
     """Posição de cada subestação.
@@ -47,6 +47,8 @@ def posicoes(
     n = len(nomes)
     if n == 0:
         return {}
+    if iteracoes is None:
+        iteracoes = 400 if n <= 1000 else 200
     idx = {s: i for i, s in enumerate(nomes)}
     ancora = np.array([CENTRO_UF.get(subestacoes[s] or "", CENTRO_PADRAO) for s in nomes], dtype=float)
     # ponto inicial determinístico em volta do centro da UF
@@ -61,13 +63,28 @@ def posicoes(
     passo = 0.08
     for it in range(iteracoes):
         desloc = np.zeros_like(pos)
-        # repulsão entre todos (n é pequeno por subestação; O(n²) é aceitável até ~2 mil)
-        d = pos[:, None, :] - pos[None, :, :]
-        dist2 = (d**2).sum(-1) + 1e-6
-        np.fill_diagonal(dist2, np.inf)
-        rep = (dist_ideal**2 / dist2)[:, :, None] * d / np.sqrt(dist2)[:, :, None]
-        rep[dist2 > (4 * dist_ideal) ** 2] = 0.0
-        desloc += rep.sum(1)
+        # repulsão só entre vizinhos próximos: grade com células do tamanho do corte,
+        # cada célula contra as 3×3 ao redor (O(n) em vez de O(n²))
+        corte = 4 * dist_ideal
+        cel = np.floor(pos / corte).astype(np.int64)
+        chave = cel[:, 0] * 100_003 + cel[:, 1]
+        ordem = np.argsort(chave, kind="stable")
+        ch_ord = chave[ordem]
+        unicas, inicio = np.unique(ch_ord, return_index=True)
+        fim = np.append(inicio[1:], len(ch_ord))
+        faixa = {int(u): (int(a), int(b)) for u, a, b in zip(unicas, inicio, fim)}
+        for u, (a, b) in faixa.items():
+            cx, cy = divmod(u, 100_003) if u >= 0 else (u // 100_003, u % 100_003)
+            meus = ordem[a:b]
+            viz = [ordem[slice(*faixa[k])] for dx in (-1, 0, 1) for dy in (-1, 0, 1)
+                   if (k := (cx + dx) * 100_003 + (cy + dy)) in faixa]
+            outros = np.concatenate(viz)
+            d = pos[meus, None, :] - pos[None, outros, :]
+            dist2 = (d**2).sum(-1) + 1e-6
+            dist2[meus[:, None] == outros[None, :]] = np.inf
+            fator = dist_ideal**2 / dist2 / np.sqrt(dist2)
+            fator[dist2 > corte**2] = 0.0
+            desloc[meus] += (fator[:, :, None] * d).sum(1)
         # atração pelas arestas
         if len(ar):
             v = pos[ar[:, 1]] - pos[ar[:, 0]]

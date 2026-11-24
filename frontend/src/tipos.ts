@@ -88,6 +88,8 @@ export interface Meta {
   pasta: string;
   inicio: string | null;
   fim: string | null;
+  data_base: string | null;
+  cenario: string;
   eventos_por_mes: { mes: string; n: number; n_realizado: number }[];
   linhas: Record<string, number>;
   info: { nome?: string; avisos?: string[] } & Record<string, unknown>;
@@ -111,4 +113,46 @@ export interface Validacao {
   erros: number;
   avisos: number;
   problemas: { severidade: string; checagem: string; tabela: string; detalhe: string }[];
+}
+
+export interface BarraBusca {
+  barra_id: string;
+  nome: string;
+  kv: number;
+  subestacao: string;
+  uf: string | null;
+  submercado: string | null;
+}
+
+export interface CenarioResumo {
+  nome: string;
+  descricao: string;
+  pai: string | null;
+  horizonte?: string;
+  n_eventos: number;
+  editavel: boolean;
+}
+
+export interface EventoCenario {
+  evento_id: string;
+  data: string;
+  acao: "entra" | "sai" | "altera";
+  entidade: string;
+  entidade_id?: string;
+  registro?: Record<string, unknown>;
+  campos?: Record<string, unknown>;
+  fonte: string;
+  confianca: string;
+  nota?: string | null;
+  cenario?: string;
+}
+
+export interface CenarioDetalhe {
+  nome: string;
+  descricao: string;
+  pai: string | null;
+  horizonte: string;
+  eventos: EventoCenario[];
+  herdados: EventoCenario[];
+  cadeia: string[];
 }

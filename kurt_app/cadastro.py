@@ -65,19 +65,41 @@ def _linhas(cur: duckdb.DuckDBPyConnection, tabela: Tabela) -> list[dict[str, An
 class Cadastro:
     """Consultas sobre um cadastro carregado em memória."""
 
-    def __init__(self, pasta: str | Path):
-        self.pasta = Path(pasta)
-        if not self.pasta.is_dir():
-            raise CadastroErro(f"pasta do cadastro não existe: {self.pasta}")
+    def __init__(
+        self,
+        pasta: str | Path | None = None,
+        tabelas: dict[str, pa.Table] | None = None,
+        info: dict[str, Any] | None = None,
+    ):
+        """Carrega de uma pasta de Parquet ou de tabelas já em memória (cenários)."""
+        if tabelas is None:
+            if pasta is None:
+                raise CadastroErro("informe a pasta ou as tabelas do cadastro")
+            self.pasta = Path(pasta)
+            if not self.pasta.is_dir():
+                raise CadastroErro(f"pasta do cadastro não existe: {self.pasta}")
+            tabelas = {nome: _ler_tabela(self.pasta, t) for nome, t in TABELAS.items()}
+            arq = self.pasta / "cadastro.json"
+            if info is None:
+                info = json.loads(arq.read_text()) if arq.exists() else {}
+        else:
+            self.pasta = Path(pasta) if pasta else Path(".")
+            tabelas = {
+                nome: tabelas.get(nome, t.schema.empty_table()).cast(t.schema)
+                for nome, t in TABELAS.items()
+            }
         self._con = duckdb.connect(":memory:")
         self._lock = threading.Lock()
-        self.tabelas: dict[str, pa.Table] = {}
-        for nome, tabela in TABELAS.items():
-            t = _ler_tabela(self.pasta, tabela)
-            self.tabelas[nome] = t
+        self.tabelas: dict[str, pa.Table] = tabelas
+        for nome, t in tabelas.items():
             self._con.register(nome, t)
-        info = self.pasta / "cadastro.json"
-        self.info: dict[str, Any] = json.loads(info.read_text()) if info.exists() else {}
+        self.info: dict[str, Any] = info or {}
+
+    def data_base(self) -> str | None:
+        """Maior vigente_de com fonte 'deck': a data da foto do caso base."""
+        with self._lock:
+            r = self._q("SELECT max(vigente_de) FROM barras WHERE fonte = 'deck'").fetchone()
+        return r[0].isoformat() if r and r[0] else None
 
     # -- auxiliares -------------------------------------------------------
     def _q(self, sql: str, params: list | None = None) -> duckdb.DuckDBPyConnection:
@@ -112,9 +134,12 @@ class Cadastro:
                 """
             ).fetchall()
             contagens = {n: self.tabelas[n].num_rows for n in TABELAS}
+        if self.info.get("horizonte"):
+            datas.append(date.fromisoformat(self.info["horizonte"]))
         return {
             "inicio": min(datas).isoformat() if datas else None,
             "fim": max(datas).isoformat() if datas else None,
+            "data_base": self.data_base(),
             "eventos_por_mes": [
                 {"mes": m, "n": n, "n_realizado": nr} for m, n, nr in meses
             ],
