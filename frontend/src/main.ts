@@ -97,6 +97,7 @@ $("#app").innerHTML = `
 <datalist id="lista-barras"></datalist>`;
 
 const mapa = new Mapa($<HTMLCanvasElement>("#mapa"));
+api.ufs().then((u) => mapa.definirUfs(u)).catch(() => {}); // fundo opcional
 let meta: Meta;
 let meses: string[] = [];
 let cenario = new URLSearchParams(location.search).get("cenario") ?? "base";

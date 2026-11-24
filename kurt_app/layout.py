@@ -11,7 +11,10 @@ para manter a forma do país reconhecível.
 
 from __future__ import annotations
 
+import json
 import zlib
+from functools import cache
+from pathlib import Path
 
 import numpy as np
 import pyarrow as pa
@@ -27,6 +30,41 @@ CENTRO_UF: dict[str, tuple[float, float]] = {
     "SP": (-48.5, -22.2), "SE": (-37.4, -10.6), "TO": (-48.3, -10.2),
 }
 CENTRO_PADRAO = (-47.9, -15.8)
+
+
+@cache
+def contornos_uf() -> dict[str, list[np.ndarray]]:
+    """Contorno simplificado de cada UF (malha do IBGE; ver scripts/malha_ufs.py)."""
+    dados = json.loads((Path(__file__).parent / "ufs.json").read_text())
+    return {uf: [np.asarray(a, dtype=float) for a in aneis] for uf, aneis in dados.items()}
+
+
+def _dentro(pts: np.ndarray, aneis: list[np.ndarray]) -> np.ndarray:
+    """Ponto em polígono (par-ímpar) para vários pontos contra os anéis de uma UF."""
+    res = np.zeros(len(pts), dtype=bool)
+    px, py = pts[:, 0:1], pts[:, 1:2]
+    for a in aneis:
+        x, y = a[:, 0], a[:, 1]
+        x2, y2 = np.roll(x, -1), np.roll(y, -1)
+        cruza = ((y > py) != (y2 > py)) & (px < (x2 - x) * (py - y) / (y2 - y + 1e-12) + x)
+        res ^= (cruza.sum(1) % 2).astype(bool)
+    return res
+
+
+def _prender_na_uf(pos: np.ndarray, ancora: np.ndarray, ufs: list[str | None]) -> None:
+    """Puxa para dentro da própria UF, na direção do centro dela, quem ficou fora."""
+    cont = contornos_uf()
+    por_uf: dict[str, list[int]] = {}
+    for i, uf in enumerate(ufs):
+        if uf in cont:
+            por_uf.setdefault(uf, []).append(i)
+    for uf, ids in por_uf.items():
+        ids_a = np.array(ids)
+        for _ in range(25):
+            fora = ids_a[~_dentro(pos[ids_a], cont[uf])]
+            if not len(fora):
+                break
+            pos[fora] = ancora[fora] + (pos[fora] - ancora[fora]) * 0.85
 
 
 def _semente(nome: str) -> float:
@@ -50,6 +88,7 @@ def posicoes(
     if iteracoes is None:
         iteracoes = 400 if n <= 1000 else 200
     idx = {s: i for i, s in enumerate(nomes)}
+    ufs = [subestacoes[s] for s in nomes]
     ancora = np.array([CENTRO_UF.get(subestacoes[s] or "", CENTRO_PADRAO) for s in nomes], dtype=float)
     # ponto inicial determinístico em volta do centro da UF
     ang = np.array([2 * np.pi * _semente(s) for s in nomes])
@@ -97,6 +136,8 @@ def posicoes(
         norma = np.sqrt((desloc**2).sum(-1, keepdims=True)) + 1e-9
         t = passo * (1 - it / iteracoes) + 0.005
         pos += desloc / norma * np.minimum(norma, t)
+        if it % 20 == 19 or it == iteracoes - 1:
+            _prender_na_uf(pos, ancora, ufs)
     return {s: (round(float(pos[i, 0]), 4), round(float(pos[i, 1]), 4)) for s, i in idx.items()}
 
 

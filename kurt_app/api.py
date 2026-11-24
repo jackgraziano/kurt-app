@@ -177,6 +177,16 @@ def criar_app(pasta_cadastro: str | Path | None = None, pasta_cenarios: str | Pa
         except (CenarioErro, ValueError) as e:
             raise HTTPException(422, str(e))
 
+    @app.get("/api/ufs")
+    def ufs():
+        """Contorno simplificado das UFs e o centro usado no layout, para o fundo do mapa."""
+        from .layout import CENTRO_UF, contornos_uf
+
+        return {
+            uf: {"aneis": [a.tolist() for a in aneis], "centro": CENTRO_UF.get(uf)}
+            for uf, aneis in contornos_uf().items()
+        }
+
     @app.get("/api/esquema")
     def esquema():
         return {

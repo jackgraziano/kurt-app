@@ -85,6 +85,7 @@ export class Mapa {
   private cy = 0;
   private arrastando: { x: number; y: number; cx: number; cy: number; moveu: boolean } | null = null;
   private ajustado = false;
+  private ufs: { uf: string; aneis: [number, number][][]; centro: [number, number] | null }[] = [];
   onClique: (alvo: Alvo | null) => void = () => {};
   onPasso: (alvo: Alvo | null, x: number, y: number) => void = () => {};
 
@@ -229,6 +230,48 @@ export class Mapa {
     this.desenhar();
   }
 
+  /** Fundo: contorno das UFs (malha do IBGE simplificada), em graus como as posições. */
+  definirUfs(ufs: Record<string, { aneis: [number, number][][]; centro: [number, number] | null }>): void {
+    this.ufs = Object.entries(ufs).map(([uf, v]) => ({ uf, ...v }));
+    this.desenhar();
+  }
+
+  private desenharUfs(w: number, h: number): void {
+    if (!this.ufs.length) return;
+    const g = this.ctx;
+    g.save();
+    g.beginPath();
+    for (const u of this.ufs) {
+      for (const anel of u.aneis) {
+        anel.forEach(([lon, lat], i) => {
+          const [x, y] = this.tela(lon, -lat);
+          if (i === 0) g.moveTo(x, y);
+          else g.lineTo(x, y);
+        });
+        g.closePath();
+      }
+    }
+    g.fillStyle = "#fdfdfc";
+    g.fill("evenodd");
+    g.lineWidth = 1;
+    g.strokeStyle = "#c3ccd6";
+    g.lineJoin = "round";
+    g.stroke();
+    // siglas, maiores quando há espaço; somem de perto para não brigar com os nomes das subestações
+    if (this.escala < 400) {
+      g.font = `600 ${Math.round(Math.min(Math.max(this.escala / 5, 10), 22))}px system-ui, sans-serif`;
+      g.fillStyle = "#b3bcc6";
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      for (const u of this.ufs) {
+        if (!u.centro) continue;
+        const [x, y] = this.tela(u.centro[0], -u.centro[1]);
+        if (x > -40 && x < w + 40 && y > -40 && y < h + 40) g.fillText(u.uf, x, y);
+      }
+    }
+    g.restore();
+  }
+
   desenhar(): void {
     const c = this.canvas;
     const dpr = window.devicePixelRatio || 1;
@@ -241,6 +284,7 @@ export class Mapa {
     const g = this.ctx;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     g.clearRect(0, 0, w, h);
+    this.desenharUfs(w, h);
 
     // ramos
     for (const a of this.arestas) {

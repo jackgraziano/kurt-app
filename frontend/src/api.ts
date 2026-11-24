@@ -26,7 +26,10 @@ async function pedir<T>(metodo: string, caminho: string, params: Params = {}, co
 
 const get = <T>(c: string, p: Params = {}) => pedir<T>("GET", c, p);
 
+export type Ufs = Record<string, { aneis: [number, number][][]; centro: [number, number] | null }>;
+
 export const api = {
+  ufs: () => get<Ufs>("/api/ufs"),
   meta: (cenario: string) => get<Meta>("/api/meta", { cenario }),
   configuracao: (cenario: string, data: string, kv_min?: number, submercado?: string) =>
     get<Configuracao>("/api/configuracao", { cenario, data, kv_min, submercado }),
