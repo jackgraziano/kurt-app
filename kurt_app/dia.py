@@ -38,7 +38,7 @@ def semana(sims: Simulacoes, s: dict, x: dict, cenario: int = 0) -> dict:
     """Séries da semana ``x`` (de ``niveis.semanas``) com as escolhas das abas."""
     caso = s.get("insumos", {}).get("rede", {}).get("caso", BASE)
     cad = sims.casos_rede.cadastro(caso)
-    usinas = cad.renovaveis(x["inicio"])
+    usinas = cad.renovaveis(data_rede(cad, x["inicio"]))
     op_ren = abas._opcoes(s, "renovaveis")
 
     def da_semana(aba: str, tabela: str) -> list[dict]:
@@ -67,6 +67,12 @@ def semana(sims: Simulacoes, s: dict, x: dict, cenario: int = 0) -> dict:
     )
     sem["usinas"] = {u["usina_id"]: u for u in usinas}
     return sem
+
+
+def data_rede(cad, data: str) -> str:
+    """Data para consultar a rede: antes da foto do caso base (backtest), vale a própria foto."""
+    base = cad.data_base()
+    return max(data, base) if base else data
 
 
 def capacidades(f, usinas: list[dict], escolha: str) -> list[dict]:
@@ -163,7 +169,8 @@ def exportar_dia(sims: Simulacoes, nome: str, data: str, cenario: int, saida: st
     _gravar(pa.Table.from_pylist(vol) if vol else pa.table({}), saida / "volumes.parquet")
 
     caso = s.get("insumos", {}).get("rede", {}).get("caso", BASE)
-    conf = sims.casos_rede.cadastro(caso).configuracao(data)
+    cad = sims.casos_rede.cadastro(caso)
+    conf = cad.configuracao(data_rede(cad, data))
     for ent in ("barras", "ramos", "usinas", "restricoes"):
         lin = conf[ent]
         _gravar(pa.Table.from_pylist(lin) if lin else TABELAS[ent].schema.empty_table(), saida / f"{ent}.parquet")

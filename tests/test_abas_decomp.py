@@ -226,3 +226,13 @@ def test_capacidade_do_ons(cli, monkeypatch):
     sem = dia.semana(sims, s, x)
     assert sem["usinas"]["U5441-1"]["cap_mw"] == 1000.0 and sem["usinas"]["U5441-1"]["cap_origem"] == "ons"
     assert sem["usinas"]["U5441-2"]["cap_origem"] == "caso"
+
+
+def test_dia_antes_da_foto_do_caso_base(cli, tmp_path):
+    # a fixture é de 10/09/2026; um dia de backtest antes disso usa a rede da foto
+    from kurt_app.dia import data_rede
+
+    cad = cli.app.state.simulacoes.casos_rede.cadastro("base")
+    assert data_rede(cad, "2026-01-05") == cad.data_base()
+    assert data_rede(cad, "2026-12-05") == "2026-12-05"
+    assert cad.renovaveis(data_rede(cad, "2026-01-05"))
