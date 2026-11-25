@@ -6,7 +6,7 @@ gravados em ``dados/formas/``. Este módulo só os lê (e não acessa o NAS):
 - ``carga.parquet`` (submercado, mes, tipo_dia, meia_hora, fator): carga sem MMGD;
   ``fator`` é a carga da meia hora dividida pela média do mês. Num mês típico, a média
   ponderada pelos dias de cada tipo vale 1, de modo que fator × MWmed do DECOMP reproduz
-  o nível do estágio e diferencia dia útil, sábado e domingo/feriado.
+  o nível do estágio e diferencia dia útil, sábado (e feriado) e domingo (e Natal/Ano-Novo).
 - ``mmgd.parquet`` (submercado, fonte, mes, meia_hora, fc): perfil da MMGD com média 1 no
   mês (o histórico do ONS não traz a capacidade, só a geração).
 - ``fc_usinas.parquet`` (id_ons, nome, ceg, fonte, uf, submercado, mes, hora, fc): fator de
@@ -69,10 +69,18 @@ def feriados(ano: int) -> frozenset[date]:
     return frozenset([date(ano, m, d) for m, d in fixos] + moveis)
 
 
+# Natal e Ano-Novo ficam abaixo de um domingo; os demais feriados ficam entre o sábado e o domingo, mais perto
+# do sábado (carga verificada do SE, 2024-2026: Consciência Negra 2025 em 0,64 numa escala domingo = 0, sábado = 1)
+FERIADOS_DOMINGO = ((1, 1), (12, 25))
+
+
 def tipo_dia(d: date) -> str:
-    if d.weekday() == 6 or d in feriados(d.year):
+    """util, sabado ou domingo; feriado em dia útil conta como sábado, salvo Natal e Ano-Novo (domingo)."""
+    if d.weekday() == 6 or (d.month, d.day) in FERIADOS_DOMINGO:
         return "domingo"
-    return "sabado" if d.weekday() == 5 else "util"
+    if d.weekday() == 5 or d in feriados(d.year):
+        return "sabado"
+    return "util"
 
 
 def datas(mes: str, tipo: str | None = None) -> list[date]:

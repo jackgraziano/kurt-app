@@ -80,6 +80,8 @@ def test_calendario():
     assert date(2026, 11, 20) in feriados(2026) and date(2023, 11, 20) not in feriados(2023)
     assert tipo_dia(date(2026, 12, 25)) == "domingo"
     assert tipo_dia(date(2026, 12, 26)) == "sabado"
+    assert tipo_dia(date(2026, 11, 20)) == "sabado"  # feriado em dia útil conta como sábado
+    assert tipo_dia(date(2027, 1, 1)) == "domingo"
     assert tipo_dia(date(2026, 12, 23)) == "util"
     assert len(datas("2026-12")) == 31
     assert len(datas("2026-12", "domingo")) == 5  # 4 domingos + Natal

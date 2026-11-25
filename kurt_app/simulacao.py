@@ -63,7 +63,7 @@ INSUMOS: tuple[Insumo, ...] = (
         "carga",
         "Carga",
         "Carga por submercado (DP do DECOMP), ANDE e MMGD, por semana e patamar, com forma semi-horária do "
-        "histórico do mês e do tipo de dia (útil, sábado, domingo/feriado).",
+        "histórico do mês e do tipo de dia (útil, sábado ou feriado, domingo ou Natal/Ano-Novo).",
         True,
     ),
     Insumo(

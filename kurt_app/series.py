@@ -3,7 +3,7 @@
 Regra de calibração, comum a carga, MMGD e renováveis:
 
 1. monta-se a forma da semana (7 dias × 48 meias horas) com os perfis históricos do
-   mês e do tipo de dia de cada dia (útil, sábado, domingo/feriado);
+   mês e do tipo de dia de cada dia (útil, sábado ou feriado, domingo ou Natal/Ano-Novo);
 2. as meias horas da semana são classificadas nos patamares do DECOMP pela carga do
    SIN: as 2×H_pesada meias horas de maior carga são o patamar pesado, as 2×H_média
    seguintes o médio, o resto o leve (H vem do registro DP do deck);
