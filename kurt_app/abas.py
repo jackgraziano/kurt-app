@@ -218,7 +218,7 @@ def _op_execucao(op: dict, s: dict) -> dict:
         "cenarios": _inteiro(op, "cenarios", 1, 200, 5),
         "semente": _inteiro(op, "semente", 0, 2**31 - 1, 0),
         "discretizacao": _escolha(op, "discretizacao", ("semi-horaria", "horaria"), "semi-horaria"),
-        "paralelo": _inteiro(op, "paralelo", 1, 64, 4),
+        "paralelo": _inteiro(op, "paralelo", 1, 64, 16),
         "rede": bool(op.get("rede", True)),
         # o que o gerador do deck do dia faz com o que é só do dia do molde DESSEM
         "ptoper": _escolha(op, "ptoper", ("retirar", "manter"), "retirar"),
