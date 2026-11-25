@@ -67,6 +67,10 @@ Escopo combinado de cada aba:
 - **Antes de commitar:** rode `make test`, que executa ruff check, ruff format --check, pytest e tsc, e `npm --prefix frontend run build`. Na máquina Linux não há `make`: rode `.venv/bin/ruff check kurt_app scripts tests`, `.venv/bin/ruff format --check kurt_app scripts tests`, `.venv/bin/pytest -q` e `npm --prefix frontend run check`.
 - **Teste de verdade no navegador:** no ambiente remoto de agentes, o Playwright e o Chromium já vêm instalados. Na máquina Linux, só há o Google Chrome em `/usr/bin/google-chrome`: instale o `playwright-core` numa pasta temporária e use `executablePath`. Suba o servidor numa porta livre, com `KURT_APP_CADASTRO`, `KURT_APP_CENARIOS` e `KURT_APP_SIMULACOES` apontando para pastas temporárias, e confira que o console fica sem erros.
 
+## Datalake do setor elétrico
+
+Há um datalake do setor elétrico em `/mnt/nas`, na máquina Linux. Todo agente pode e deve consultá-lo para conhecer os dados antes de desenhar ou implementar qualquer insumo: decks oficiais (NEWAVE, DECOMP, DESSEM), históricos do ONS, vazões e dados da ANEEL. Prefira o que está lá a baixar da internet. Um levantamento do conteúdo fica em `dados/levantamento/`; atualize-o quando achar algo novo. Use só leitura, rode com `nice` e não copie volumes grandes para fora do NAS.
+
 ## Ambiente e operação
 
 - **Máquina Linux** (usuário Jackson): repositórios em `~/code/kurt` e `~/code/kurt-app`. O caso base do SIN está em `~/code/kurt-app/dados/cadastro/base-20261120`. Os decks ficam no NAS, em `/mnt/nas/personal_folder/Decks`.

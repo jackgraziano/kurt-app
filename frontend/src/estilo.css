@@ -2,8 +2,6 @@
 html, body { margin: 0; height: 100%; font: 13px/1.4 system-ui, -apple-system, "Segoe UI", sans-serif; color: #1d2433; background: #f6f7f9; }
 #app { display: flex; flex-direction: column; height: 100vh; }
 
-header.topo .marca { color: inherit; text-decoration: none; }
-#trilha b { font-size: 14px; }
 header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 14px; background: #fff; border-bottom: 1px solid #e3e6eb; }
 .marca { font-weight: 700; font-size: 15px; }
 .marca span { font-weight: 400; color: #667; }
@@ -94,42 +92,59 @@ table.kv.conf-previsto caption, table.kv.conf-contratado caption, table.kv.conf-
 #resumo.carregando::after { content: "carregando…"; display: block; font-style: italic; color: #667; }
 
 /* ---------- casca: tela principal e tela do cenário ---------- */
-header.topo { justify-content: flex-start; }
+:root { --azul: #1f3b57; --azul-claro: #e8eef4; --borda: #e3e6eb; --texto: #1d2433; --suave: #667085; }
+header.topo { justify-content: flex-start; gap: 18px; background: var(--azul); color: #fff; border-bottom: 0; padding: 10px 18px; }
+header.topo .marca { display: flex; align-items: center; gap: 8px; color: #fff; font-size: 15px; text-decoration: none; }
+header.topo .logo { width: 12px; height: 12px; border: 2px solid #fff; border-radius: 2px; }
+#trilha { display: flex; align-items: baseline; gap: 8px; }
+#trilha a.voltar { color: #fff; text-decoration: none; padding: 3px 10px; border: 1px solid rgba(255,255,255,.35); border-radius: 6px; font-size: 12px; }
+#trilha a.voltar:hover { background: rgba(255,255,255,.12); }
+#trilha .sep { color: rgba(255,255,255,.4); }
+#trilha .atual { font-weight: 600; }
+#trilha .horizonte { color: rgba(255,255,255,.7); font-size: 12px; }
+header.topo .cadastro { margin-left: auto; color: rgba(255,255,255,.7); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .barra-rede { justify-content: flex-end; padding: 6px 14px; }
 .tela-rolavel { flex: 1; overflow: auto; min-height: 0; }
 #tela-cenario { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 #tela-rede { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 #tela-rede[hidden], .tela-rolavel[hidden], #tela-cenario[hidden] { display: none; }
-#abas-cenario { display: flex; gap: 2px; padding: 0 14px; background: #fff; border-bottom: 1px solid #e3e6eb; }
-#abas-cenario a { padding: 9px 14px; color: #556; text-decoration: none; }
-#abas-cenario a:hover { background: #f0f2f5; }
-#abas-cenario a.ativa { color: #1d2433; font-weight: 600; box-shadow: inset 0 -2px 0 #1f3b57; }
-#abas-cenario a.esqueleto { color: #99a; }
-.inicio, .pagina { max-width: 1040px; margin: 0 auto; padding: 20px 24px 40px; }
-.inicio h2, .pagina h2 { margin: 4px 0 6px; font-size: 20px; }
-.pagina h3 { margin: 22px 0 8px; font-size: 14px; }
-.sub { color: #667; }
-.grade-inicio { display: grid; grid-template-columns: 320px 1fr; gap: 20px; align-items: start; margin-top: 16px; }
-.cartao { display: flex; flex-direction: column; gap: 8px; background: #fff; border: 1px solid #e3e6eb; border-radius: 10px; padding: 14px 16px; }
-.cartao h3 { margin: 0 0 4px; font-size: 14px; }
-.cartao label { display: flex; flex-direction: column; gap: 3px; color: #445; font-size: 12px; }
-.cartao input, .cartao select { font: inherit; padding: 5px 7px; border: 1px solid #cfd4dc; border-radius: 6px; }
-.cartao .par { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.cartao button { align-self: flex-start; padding: 5px 12px; }
-.lista-sim { display: flex; flex-direction: column; gap: 10px; }
-a.cartao.sim { color: inherit; text-decoration: none; gap: 4px; }
-a.cartao.sim:hover { border-color: #1f3b57; }
-.sim-topo { display: flex; justify-content: space-between; gap: 12px; }
-.sim-topo b { font-size: 14px; }
-.pagina .cartao { max-width: 520px; }
-table.insumos { border-collapse: collapse; width: 100%; background: #fff; border: 1px solid #e3e6eb; border-radius: 10px; }
-table.insumos th, table.insumos td { text-align: left; padding: 8px 12px; border-bottom: 1px solid #eef0f3; vertical-align: top; }
-table.insumos th { width: 140px; }
-table.insumos a { color: #1f3b57; }
-.estado { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #eef0f3; color: #667; white-space: nowrap; }
+#abas-cenario { display: flex; align-items: center; gap: 2px; padding: 0 14px; background: #fff; border-bottom: 1px solid var(--borda); }
+#abas-cenario a { padding: 10px 14px; color: #556; text-decoration: none; }
+#abas-cenario a:hover { background: #f3f5f8; }
+#abas-cenario a.ativa { color: var(--texto); font-weight: 600; box-shadow: inset 0 -2px 0 var(--azul); }
+#abas-cenario a.esqueleto { color: #9aa3af; }
+.inicio, .pagina { max-width: 1080px; margin: 0 auto; padding: 28px 28px 48px; }
+.inicio h2, .pagina h2 { margin: 0 0 6px; font-size: 22px; letter-spacing: -.01em; }
+.pagina h3 { margin: 26px 0 10px; font-size: 14px; }
+.sub { color: var(--suave); }
+.grade-inicio { display: grid; grid-template-columns: minmax(300px, 360px) 1fr; gap: 24px; align-items: start; margin-top: 20px; }
+.cartao { display: flex; flex-direction: column; gap: 12px; background: #fff; border: 1px solid var(--borda); border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 2px rgba(16,24,40,.04); min-width: 0; }
+.cartao h3 { margin: 0; font-size: 15px; }
+.cartao label { display: flex; flex-direction: column; gap: 4px; color: #344054; font-size: 12px; font-weight: 500; min-width: 0; }
+.cartao input, .cartao select { width: 100%; min-width: 0; font: inherit; font-weight: 400; padding: 7px 9px; border: 1px solid #d0d5dd; border-radius: 8px; background: #fff; color: var(--texto); }
+.cartao input:focus, .cartao select:focus { outline: 2px solid rgba(31,59,87,.25); border-color: var(--azul); }
+.cartao .par { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.cartao button { align-self: flex-start; padding: 7px 14px; border-radius: 8px; }
+button.primario { background: var(--azul); color: #fff; border-color: var(--azul); font-weight: 600; }
+button.primario:hover { background: #2b4f73; }
+.lista-sim { display: flex; flex-direction: column; gap: 12px; }
+.lista-sim .vazio { padding: 28px; text-align: center; background: #fff; border: 1px dashed #d0d5dd; border-radius: 12px; }
+a.cartao.sim { color: inherit; text-decoration: none; gap: 6px; transition: border-color .15s, box-shadow .15s; }
+a.cartao.sim:hover { border-color: var(--azul); box-shadow: 0 2px 8px rgba(16,24,40,.08); }
+.sim-topo { display: flex; justify-content: space-between; gap: 12px; align-items: baseline; }
+.sim-topo b { font-size: 15px; }
+.pagina .cartao { max-width: 560px; }
+table.insumos { border-collapse: separate; border-spacing: 0; width: 100%; background: #fff; border: 1px solid var(--borda); border-radius: 12px; overflow: hidden; }
+table.insumos th, table.insumos td { text-align: left; padding: 10px 14px; border-bottom: 1px solid #eef0f3; vertical-align: top; }
+table.insumos tr:last-child th, table.insumos tr:last-child td { border-bottom: 0; }
+table.insumos th { width: 150px; }
+table.insumos a { color: var(--azul); text-decoration: none; }
+table.insumos a:hover { text-decoration: underline; }
+.estado { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #eef0f3; color: var(--suave); white-space: nowrap; }
 .estado.definido { background: #e3f3e7; color: #2e7d43; }
 .estado.a-definir { background: #fff4dc; color: #8a6200; }
-.pagina p.vazio { margin-top: 18px; }
+.pagina p.vazio { margin-top: 18px; padding: 18px; background: #fff; border: 1px dashed #d0d5dd; border-radius: 12px; }
+@media (max-width: 760px) { .grade-inicio { grid-template-columns: 1fr; } }
 .acoes-json { margin-left: auto; display: flex; gap: 6px; align-items: center; }
-#abas-cenario .acoes-json a, .acoes-json label { padding: 4px 10px; border: 1px solid #cfd4dc; border-radius: 6px; color: #1f3b57; background: #fff; cursor: pointer; font-size: 12px; text-decoration: none; }
+#abas-cenario .acoes-json a, .acoes-json label { padding: 4px 10px; border: 1px solid #cfd4dc; border-radius: 6px; color: var(--azul); background: #fff; cursor: pointer; font-size: 12px; text-decoration: none; }
 #abas-cenario .acoes-json a:hover, .acoes-json label:hover { background: #f0f2f5; }

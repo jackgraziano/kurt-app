@@ -11,8 +11,9 @@ import { $, aviso, esc, fimDoMes, fmtData, listaMeses, rotuloMes } from "./util"
 
 $("#app").innerHTML = `
 <header class="topo">
-  <a class="marca" href="#/">kurt-app <span id="cadastro-nome"></span></a>
-  <span id="trilha"></span>
+  <a class="marca" href="#/" title="Voltar à lista de cenários"><span class="logo"></span>kurt-app</a>
+  <nav id="trilha"></nav>
+  <span id="cadastro-nome" class="cadastro"></span>
 </header>
 <section id="tela-inicio" class="tela-rolavel" hidden></section>
 <section id="tela-cenario" hidden>
@@ -42,7 +43,7 @@ function mesSeguinte(iso: string, n = 1): string {
 // ---------- tela principal ----------
 async function telaInicio(): Promise<void> {
   mostrarTela("inicio");
-  $("#trilha").textContent = "";
+  $("#trilha").innerHTML = `<span class="atual">Cenários</span>`;
   const el = $("#tela-inicio");
   const [sims, casos] = await Promise.all([api.simulacoes(), api.cenarios()]);
   const base = meta.data_base ?? new Date().toISOString().slice(0, 10);
@@ -64,7 +65,7 @@ async function telaInicio(): Promise<void> {
           </div>
           <label>Caso de rede <select name="caso_rede">${opcoesCasos(casos, "base")}</select></label>
           <p class="sub" id="f-horizonte"></p>
-          <button>criar cenário</button>
+          <button class="primario">criar cenário</button>
         </form>
         <div class="lista-sim">
           ${sims.length ? sims.map(cartaoSimulacao).join("") : `<p class="vazio">Nenhum cenário ainda. Crie o primeiro ao lado.</p>`}
@@ -133,7 +134,7 @@ async function telaCenario(nome: string, aba: string): Promise<void> {
     return;
   }
   mostrarTela("cenario");
-  $("#trilha").innerHTML = `/ <b>${esc(s.nome)}</b> <span class="sub">${horizonte(s)}</span>`;
+  $("#trilha").innerHTML = `<a href="#/" class="voltar">← Cenários</a><span class="sep">/</span><span class="atual">${esc(s.nome)}</span><span class="horizonte">${horizonte(s)}</span>`;
   const abas = [{ id: ABA_RESUMO, rotulo: "Resumo", disponivel: true }, ...insumos];
   if (!abas.some((a) => a.id === aba)) aba = ABA_RESUMO;
   const comJson = aba !== ABA_RESUMO && insumos.some((i) => i.id === aba && i.disponivel);
@@ -237,7 +238,7 @@ async function mostrarResumo(s: Simulacao): Promise<void> {
         <label>Fim <input name="fim" type="month" required value="${s.fim.slice(0, 7)}" /></label>
       </div>
       <label>Caso de rede <select name="caso">${opcoesCasos(casos, casoRede(s))}</select></label>
-      <div><button>salvar</button></div>
+      <div><button class="primario">salvar</button></div>
     </form>
     <h3>Insumos</h3>
     <table class="insumos">${linhas}</table>
@@ -290,7 +291,7 @@ async function rotear(): Promise<void> {
 (async () => {
   try {
     [meta, insumos] = await Promise.all([api.meta("base"), api.insumos()]);
-    $("#cadastro-nome").textContent = meta.info.nome ? `· ${meta.info.nome}` : "";
+    $("#cadastro-nome").textContent = meta.info.nome ? `caso base: ${meta.info.nome}` : "";
     window.addEventListener("hashchange", () => void rotear());
     await rotear();
   } catch (err) {
