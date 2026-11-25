@@ -6,7 +6,9 @@ eventos). Os cenários ficam em arquivos JSON na pasta de cenários.
 
 from __future__ import annotations
 
+import base64
 import os
+import secrets
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict
@@ -14,8 +16,8 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
-from fastapi import Body, FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import Body, FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from . import __version__, decks
@@ -46,6 +48,33 @@ def _erros(nao_existe: str, prefixo: str = "") -> Iterator[None]:
         raise HTTPException(422, f"{prefixo}{e}") from None
 
 
+def _senha(app: FastAPI) -> None:
+    """Senha opcional (HTTP Basic), para quando o app for exposto por um túnel.
+
+    ``KURT_APP_SENHA_ARQUIVO`` aponta para um arquivo com ``usuario:senha`` numa linha.
+    Sem a variável, o app segue aberto, como na rede local.
+    """
+    arq = os.environ.get("KURT_APP_SENHA_ARQUIVO")
+    if not arq:
+        return
+    esperado = Path(arq).read_text().strip().encode()
+    if b":" not in esperado:
+        raise SystemExit(f"{arq}: use uma linha usuario:senha")
+
+    @app.middleware("http")
+    async def exigir_senha(request: Request, call_next):
+        h = request.headers.get("authorization", "")
+        ok = False
+        if h.lower().startswith("basic "):
+            try:
+                ok = secrets.compare_digest(base64.b64decode(h[6:]), esperado)
+            except ValueError:
+                ok = False
+        if not ok:
+            return Response("senha necessária", 401, {"WWW-Authenticate": 'Basic realm="kurt-app"'})
+        return await call_next(request)
+
+
 def criar_app(
     pasta_cadastro: str | Path | None = None,
     pasta_cenarios: str | Path | None = None,
@@ -70,6 +99,7 @@ def criar_app(
     app.state.simulacoes = simulacoes
     rodadas = Rodadas(simulacoes)
     app.state.rodadas = rodadas
+    _senha(app)
 
     def cad(nome: str | None) -> Cadastro:
         with _erros(f"cenário {nome} não existe", f"cenário {nome} não se aplica: "):

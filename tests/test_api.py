@@ -44,3 +44,21 @@ def test_eventos_e_diferenca(cli):
 
 def test_validacao(cli):
     assert cli.get("/api/validacao").json()["erros"] == 0
+
+
+def test_senha_opcional(tmp_path, monkeypatch):
+    import base64
+
+    from fastapi.testclient import TestClient
+
+    from kurt_app.api import criar_app
+
+    arq = tmp_path / "senha"
+    arq.write_text("kurt:segredo\n")
+    monkeypatch.setenv("KURT_APP_SENHA_ARQUIVO", str(arq))
+    c = TestClient(criar_app(None, tmp_path / "cen", tmp_path / "sim"))
+    assert c.get("/api/simulacoes").status_code == 401
+    ruim = base64.b64encode(b"kurt:errada").decode()
+    assert c.get("/api/simulacoes", headers={"Authorization": f"Basic {ruim}"}).status_code == 401
+    bom = base64.b64encode(b"kurt:segredo").decode()
+    assert c.get("/api/simulacoes", headers={"Authorization": f"Basic {bom}"}).status_code == 200

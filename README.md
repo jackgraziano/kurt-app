@@ -136,6 +136,7 @@ Dados locais, fora do git (`dados/`):
 | pastas de decks DECOMP (uma subpasta ou .zip por deck) | fontes da aba Decks | `KURT_APP_DECKS` (separadas por `:`) |
 | decks oficiais do ONS (`<ano>/<AAAAMMDD>__DEC_ONS_..._VE.zip`) | fonte da aba Decks, para backtest | `KURT_APP_DECKS_ONS` |
 | executável que roda um dia no Kurt (`scripts/rodar_dia.sh` do Kurt) | disparo de rodadas | `KURT_APP_RODAR_DIA` |
+| arquivo com `usuario:senha`; liga a senha (HTTP Basic) em todo o app, para expor por túnel | servidor | `KURT_APP_SENHA_ARQUIVO` |
 
 ## Fixture
 
