@@ -267,3 +267,21 @@ export interface Resultados {
   meses: (Quantis & { mes: string; submercado: string; tipo: string })[];
   usinas: (Quantis & { usina_id: string; submercado: string; fonte: string })[];
 }
+
+// sensibilidades (Carga e Renováveis) e energia por dia
+export interface RegraNivel {
+  fonte: string;
+  submercado: string;
+  fator: number;
+  meses?: string[];
+  datas?: string[];
+}
+export interface Sensibilidade {
+  nivel: RegraNivel[];
+  forma: Record<string, number[]>;
+}
+export interface Energia {
+  semana: string;
+  dias: string[];
+  base: Record<string, number[]>;
+}

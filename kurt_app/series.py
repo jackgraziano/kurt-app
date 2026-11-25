@@ -133,8 +133,8 @@ def semana(
 
     ``carga``, ``pequenas``, ``ande`` e ``renovaveis`` são as linhas do DECOMP já filtradas
     para a semana. ``usinas`` são as eólicas e solares vigentes (usina_id, fonte_energia,
-    submercado, cap_mw, uf). ``opcoes``: ``ajuste_carga`` {sub: fator},
-    ``renovaveis_nivel`` ("decomp" escala as usinas para bater com os equivalentes;
+    submercado, cap_mw, uf). ``opcoes``: ``sensibilidade_carga`` (nível e forma da carga,
+    fonte "CARGA"), ``renovaveis_nivel`` ("decomp" escala as usinas para bater com os equivalentes;
     "capacidade" usa só capacidade × fator de capacidade histórico), ``semente`` e
     ``sensibilidade`` (ajustes do usuário no nível e na forma, ver ``multiplicador``).
     """
@@ -149,11 +149,10 @@ def semana(
     sin = sum(tipicas[s] * medias[s] for s in SUBMERCADOS)
     pat = patamares(sin, x["horas"])
 
-    ajuste = op.get("ajuste_carga") or {}
+    sens_carga = op.get("sensibilidade_carga") or {}
     out_carga = {}
     for s in SUBMERCADOS:
-        alvo = {p: v * float(ajuste.get(s, 1.0)) for p, v in niveis_carga[s].items()}
-        serie = ajustar(tipicas[s], pat, alvo)
+        serie = ajustar(tipicas[s], pat, niveis_carga[s])
         if cenario > 0:
             razao = np.concatenate(
                 [
@@ -162,6 +161,8 @@ def semana(
                 ]
             )
             serie = serie * razao
+        if sens_carga:
+            serie = serie * multiplicador(sens_carga, "CARGA", s, dias, serie)
         out_carga[s] = serie
 
     # MMGD (PQ marcado como MMGD), por submercado e fonte
@@ -234,7 +235,8 @@ def multiplicador(sens: dict, fonte: str, sub: str, dias: list[date], base: np.n
 
     ``sens["forma"][fonte]``: 24 pesos horários; mudam a forma do dia sem mudar a energia
     do grupo (o dia é reescalado). ``sens["nivel"]``: lista de {fonte, submercado ("todos"),
-    meses (opcional, AAAA-MM), fator}; muda a energia. As regras se multiplicam.
+    meses (opcional, AAAA-MM) ou datas (opcional, AAAA-MM-DD), fator}; muda a energia.
+    As regras se multiplicam.
     """
     out = np.ones(7 * MEIAS)
     pesos = (sens.get("forma") or {}).get(fonte)
@@ -248,8 +250,10 @@ def multiplicador(sens: dict, fonte: str, sub: str, dias: list[date], base: np.n
     for r in sens.get("nivel") or []:
         if r["fonte"] != fonte or r.get("submercado", "todos") not in ("todos", sub):
             continue
+        meses, datas = r.get("meses"), r.get("datas")
         for i, d in enumerate(dias):
-            if not r.get("meses") or d.isoformat()[:7] in r["meses"]:
+            iso = d.isoformat()
+            if (not meses and not datas) or (meses and iso[:7] in meses) or (datas and iso in datas):
                 out[i * MEIAS : (i + 1) * MEIAS] *= float(r["fator"])
     return out
 

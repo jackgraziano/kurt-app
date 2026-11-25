@@ -102,6 +102,7 @@ Todas as consultas de rede aceitam `?cenario=<caso de rede>` (padrão `base`).
 | `GET /api/decks/fontes` | fontes de decks DECOMP configuradas |
 | `GET /api/decks?tipo&caminho&inicio&fim` | decks de uma fonte e o mapa semana → deck |
 | `GET /api/simulacoes/{nome}/semana?inicio&cenario` | séries semi-horárias de uma semana (gráficos de Carga e Renováveis) |
+| `GET /api/simulacoes/{nome}/energia?inicio&cenario` | MW médio por dia de carga, MMGD, EOL e UFV por submercado, antes das sensibilidades (tabela de GWmed) |
 | `GET/POST /api/simulacoes/{nome}/rodadas`, `GET .../rodadas/{id}`, `POST .../rodadas/{id}/cancelar`, `GET .../rodadas/{id}/resultados` | rodadas do Kurt e resultados P10/P50/P90 |
 | `GET /api/ufs`, `GET /api/esquema` | contorno das UFs e esquema das tabelas |
 

@@ -109,17 +109,40 @@ def _op_carga(op: dict, _s: dict) -> dict:
     for k, v in ajuste.items():
         if k not in ("SE", "S", "NE", "N") or _numero(v, f"ajuste {k}") <= 0:
             raise SimulacaoErro(f"opção ajuste: {k}={v!r} inválido (submercados SE, S, NE, N; fator > 0)")
+    sens = op.get("sensibilidade")
+    if ajuste:  # formato antigo (fator por submercado): vira regra de nível da carga
+        sens = dict(sens or {})
+        sens["nivel"] = [
+            *(sens.get("nivel") or []),
+            *({"fonte": "CARGA", "submercado": k, "fator": float(v)} for k, v in ajuste.items()),
+        ]
     return {
-        "ajuste": {k: float(v) for k, v in ajuste.items()},
         "correcao_nivel": _escolha(op, "correcao_nivel", ("nenhuma", "historica"), "nenhuma"),
+        "sensibilidade": _sensibilidade(sens, FONTES_CARGA),
     }
 
 
 FONTES_SENS = ("EOL", "UFV", "MMGD")
+FONTES_CARGA = ("CARGA",)
 SUBS_SENS = ("todos", "SE", "S", "NE", "N")
 
 
-def _sensibilidade(sens: Any) -> dict:
+def _lista_datas(v: Any, onde: str, mes: bool) -> list[str]:
+    nome, fmt = ("meses", "AAAA-MM") if mes else ("datas", "AAAA-MM-DD")
+    v = v or []
+    if not isinstance(v, list) or any(not isinstance(m, str) for m in v):
+        raise SimulacaoErro(f"{onde}: {nome} deve ser uma lista de {fmt}")
+    try:
+        for m in v:
+            if len(m) != len(fmt):
+                raise ValueError
+            date.fromisoformat(m + "-01" if mes else m)
+    except ValueError:
+        raise SimulacaoErro(f"{onde}: {nome} deve ser uma lista de {fmt} ({m!r} inválido)") from None
+    return sorted(set(v))
+
+
+def _sensibilidade(sens: Any, fontes: tuple = FONTES_SENS) -> dict:
     if sens in (None, {}):
         return {"nivel": [], "forma": {}}
     if not isinstance(sens, dict):
@@ -127,25 +150,25 @@ def _sensibilidade(sens: Any) -> dict:
     nivel = []
     for i, r in enumerate(sens.get("nivel") or []):
         onde = f"sensibilidade.nivel, item {i + 1}"
-        if not isinstance(r, dict) or r.get("fonte") not in FONTES_SENS:
-            raise SimulacaoErro(f"{onde}: fonte deve ser {', '.join(FONTES_SENS)}")
+        if not isinstance(r, dict) or r.get("fonte") not in fontes:
+            raise SimulacaoErro(f"{onde}: fonte deve ser {', '.join(fontes)}")
         sub = r.get("submercado", "todos")
         if sub not in SUBS_SENS:
             raise SimulacaoErro(f"{onde}: submercado deve ser {', '.join(SUBS_SENS)}")
         fator = _numero(r.get("fator"), f"{onde}, fator")
         if not 0 <= fator <= 5:
             raise SimulacaoErro(f"{onde}: fator {fator} fora de 0 a 5 (1 = sem mudança)")
-        meses = r.get("meses") or []
-        if not isinstance(meses, list) or any(not isinstance(m, str) or len(m) != 7 for m in meses):
-            raise SimulacaoErro(f"{onde}: meses deve ser uma lista de AAAA-MM")
+        meses = _lista_datas(r.get("meses"), onde, True)
+        dts = _lista_datas(r.get("datas"), onde, False)
+        if meses and dts:
+            raise SimulacaoErro(f"{onde}: use meses ou datas, não os dois na mesma regra")
         if abs(fator - 1) > 1e-9:
-            nivel.append(
-                {"fonte": r["fonte"], "submercado": sub, "fator": fator, **({"meses": meses} if meses else {})}
-            )
+            extra = {"meses": meses} if meses else {"datas": dts} if dts else {}
+            nivel.append({"fonte": r["fonte"], "submercado": sub, "fator": fator, **extra})
     forma = {}
     for fonte, pesos in (sens.get("forma") or {}).items():
-        if fonte not in FONTES_SENS:
-            raise SimulacaoErro(f"sensibilidade.forma: fonte {fonte!r} inválida (use {', '.join(FONTES_SENS)})")
+        if fonte not in fontes:
+            raise SimulacaoErro(f"sensibilidade.forma: fonte {fonte!r} inválida (use {', '.join(fontes)})")
         if not isinstance(pesos, list) or len(pesos) != 24:
             raise SimulacaoErro(f"sensibilidade.forma.{fonte}: use 24 pesos, um por hora (1 = sem mudança)")
         w = [_numero(v, f"sensibilidade.forma.{fonte}") for v in pesos]
@@ -262,7 +285,10 @@ ABAS: dict[str, Aba] = {
         (
             *AJUDA_COMUM,
             f"carga: MWmed por submercado e patamar ({PAT}). A forma semi-horária vem do histórico do mês e tipo de dia.",
-            'opcoes.ajuste: fator por submercado aplicado a toda a carga, ex.: {"NE": 1.03}.',
+            "opcoes.sensibilidade.nivel: lista de {fonte: CARGA, submercado: todos | SE | S | NE | N, fator,"
+            ' meses (opcional, ["2027-01"]) ou datas (opcional, ["2027-01-15"])}; ex.: fator 1.03 = 3% mais carga.'
+            " As regras se multiplicam. A tela de energia grava aqui os alvos em GWmed por mês, semana ou dia.",
+            "opcoes.sensibilidade.forma: {CARGA: 24 pesos horários}; muda a forma do dia sem mudar a energia.",
         ),
     ),
     "renovaveis": Aba(
@@ -286,7 +312,8 @@ ABAS: dict[str, Aba] = {
             "opcoes.correcao_nivel: 'historica' multiplica os equivalentes do DECOMP pela razão histórica entre a"
             " previsão do DESSEM e o DECOMP (por fonte, submercado, mês e patamar); 'nenhuma' usa o DECOMP.",
             "opcoes.sensibilidade.nivel: lista de {fonte: EOL | UFV | MMGD, submercado: todos | SE | S | NE | N,"
-            ' fator, meses (opcional, ["2027-01"])}; ex.: fator 1.1 = 10% mais geração. As regras se multiplicam.',
+            ' fator, meses (opcional, ["2027-01"]) ou datas (opcional, ["2027-01-15"])}; ex.: fator 1.1 = 10% mais'
+            " geração. As regras se multiplicam. A tela de energia grava aqui os alvos em GWmed por período.",
             "opcoes.sensibilidade.forma: {fonte: 24 pesos horários}; muda a forma do dia sem mudar a energia,"
             " ex.: pesos maiores das 10 às 15 h concentram a solar no meio-dia. Nenhuma usina passa da capacidade.",
         ),

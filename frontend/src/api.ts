@@ -1,4 +1,4 @@
-import type { BarraBusca, CenarioDetalhe, CenarioResumo, Configuracao, Deck, Diferenca, DocInsumo, Evento, EventoCenario, Ficha, FonteDecks, Insumo, Meta, Resultados, RodadaResumo, SemanaDeck, SemanaSeries, Simulacao, Validacao } from "./tipos";
+import type { BarraBusca, CenarioDetalhe, CenarioResumo, Configuracao, Deck, Diferenca, Energia, DocInsumo, Evento, EventoCenario, Ficha, FonteDecks, Insumo, Meta, Resultados, RodadaResumo, SemanaDeck, SemanaSeries, Simulacao, Validacao } from "./tipos";
 
 type Params = Record<string, string | number | undefined>;
 
@@ -61,6 +61,8 @@ export const api = {
   insumo: <T>(nome: string, aba: string) => get<DocInsumo<T>>(`/api/simulacoes/${encodeURIComponent(nome)}/insumos/${aba}`),
   semana: (nome: string, inicio: string, cenario = 0) =>
     get<SemanaSeries>(`/api/simulacoes/${encodeURIComponent(nome)}/semana`, { inicio, cenario }),
+  energia: (nome: string, inicio: string, cenario = 0) =>
+    get<Energia>(`/api/simulacoes/${encodeURIComponent(nome)}/energia`, { inicio, cenario }),
   rodadas: (nome: string) => get<RodadaResumo[]>(`/api/simulacoes/${encodeURIComponent(nome)}/rodadas`),
   dispararRodada: (nome: string) => pedir<RodadaResumo>("POST", `/api/simulacoes/${encodeURIComponent(nome)}/rodadas`),
   cancelarRodada: (nome: string, id: string) =>

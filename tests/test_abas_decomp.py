@@ -286,3 +286,63 @@ def test_sensibilidade_invalida_nao_grava(cli):
     doc["dados"]["opcoes"]["sensibilidade"] = {"nivel": [{"fonte": "EOL", "fator": 9}]}
     assert cli.post("/api/simulacoes/s1/insumos/renovaveis", json=doc).status_code == 422
     assert cli.get("/api/simulacoes/s1").json() == antes
+
+
+def test_sensibilidade_da_carga_e_datas(cli):
+    sims = cli.app.state.simulacoes
+    x = niveis.semanas(sims.ler("s1"))[0]
+    base = dia.semana(sims, sims.ler("s1"), x)
+    d0 = base["dias"][0]
+    doc = cli.get("/api/simulacoes/s1/insumos/carga").json()
+    doc["dados"]["opcoes"]["sensibilidade"] = {
+        "nivel": [
+            {"fonte": "CARGA", "submercado": "NE", "fator": 1.1},
+            {"fonte": "CARGA", "submercado": "todos", "fator": 0.5, "datas": [d0]},
+        ],
+    }
+    assert cli.post("/api/simulacoes/s1/insumos/carga", json=doc).status_code == 200
+    sem = dia.semana(sims, sims.ler("s1"), x)
+    ne, ne0 = sem["carga"]["NE"], base["carga"]["NE"]
+    assert ne[:48].sum() == pytest.approx(0.55 * ne0[:48].sum())  # 1,1 × 0,5 no primeiro dia
+    assert ne[48:].sum() == pytest.approx(1.1 * ne0[48:].sum())
+    assert sem["carga"]["SE"][48:].sum() == pytest.approx(base["carga"]["SE"][48:].sum())
+    # ida e volta estável
+    doc2 = cli.get("/api/simulacoes/s1/insumos/carga").json()
+    assert doc2["dados"]["opcoes"]["sensibilidade"] == doc["dados"]["opcoes"]["sensibilidade"] | {"forma": {}}
+    assert cli.post("/api/simulacoes/s1/insumos/carga", json=doc2).status_code == 200
+    # fonte de renováveis na carga e datas inválidas não gravam
+    antes = cli.get("/api/simulacoes/s1").json()
+    for regra in (
+        {"fonte": "EOL", "fator": 1.1},
+        {"fonte": "CARGA", "fator": 1.1, "datas": ["2026-13-01"]},
+        {"fonte": "CARGA", "fator": 1.1, "datas": [d0], "meses": [d0[:7]]},
+    ):
+        doc2["dados"]["opcoes"]["sensibilidade"] = {"nivel": [regra]}
+        assert cli.post("/api/simulacoes/s1/insumos/carga", json=doc2).status_code == 422
+    assert cli.get("/api/simulacoes/s1").json() == antes
+
+
+def test_ajuste_antigo_da_carga_vira_sensibilidade(cli):
+    doc = cli.get("/api/simulacoes/s1/insumos/carga").json()
+    doc["dados"]["opcoes"] = {"ajuste": {"SE": 1.02}}
+    assert cli.post("/api/simulacoes/s1/insumos/carga", json=doc).status_code == 200
+    op = cli.get("/api/simulacoes/s1/insumos/carga").json()["dados"]["opcoes"]
+    assert "ajuste" not in op
+    assert op["sensibilidade"]["nivel"] == [{"fonte": "CARGA", "submercado": "SE", "fator": 1.02}]
+
+
+def test_energia_por_dia_sem_sensibilidades(cli):
+    sims = cli.app.state.simulacoes
+    x = niveis.semanas(sims.ler("s1"))[0]
+    r = cli.get("/api/simulacoes/s1/energia", params={"inicio": x["inicio"]})
+    assert r.status_code == 200
+    e = r.json()
+    assert len(e["dias"]) == 7 and "CARGA SE" in e["base"] and "ANDE" in e["base"]
+    sem = dia.semana(sims, sims.ler("s1"), x)
+    assert e["base"]["CARGA SE"][0] == pytest.approx(sem["carga"]["SE"][:48].mean(), abs=0.1)
+    # a sensibilidade não muda a base (a tela aplica os fatores por cima)
+    doc = cli.get("/api/simulacoes/s1/insumos/carga").json()
+    doc["dados"]["opcoes"]["sensibilidade"] = {"nivel": [{"fonte": "CARGA", "fator": 1.3}]}
+    assert cli.post("/api/simulacoes/s1/insumos/carga", json=doc).status_code == 200
+    assert cli.get("/api/simulacoes/s1/energia", params={"inicio": x["inicio"]}).json() == e
+    assert cli.get("/api/simulacoes/s1/energia", params={"inicio": "1999-01-02"}).status_code == 422
