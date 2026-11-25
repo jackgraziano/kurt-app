@@ -46,8 +46,8 @@ def test_rodada_e_resultados(cli, tmp_path):
     assert r["status"] == "concluida" and r["contagem"]["ok"] == 9  # 3 dias × 3 cenários
     res = rod.resultados("s1", r["id"])
     sin = {(m["submercado"], m["tipo"]): m for m in res["meses"] if m["mes"] == "2026-12"}
-    # rede: 100·(k+1) MW × 24 h × 31 dias, em GWh; P50 é o cenário do meio (k = 1)
-    assert sin[("NE", "rede")]["p50"] == pytest.approx(200 * 24 * 31 / 1000)
+    # rede: 100·(k+1) MW × 24 h × 31 dias, em GWh; k = 1..3 e P50 é o do meio (k = 2)
+    assert sin[("NE", "rede")]["p50"] == pytest.approx(300 * 24 * 31 / 1000)
     assert sin[("NE", "ENE")]["p10"] == pytest.approx(10 * 24 * 31 / 1000)
     assert res["usinas"][0]["usina_id"] == "U5441-1"
     assert rod.listar("s1")[0]["contagem"]["ok"] == 9

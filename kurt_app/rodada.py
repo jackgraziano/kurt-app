@@ -1,7 +1,8 @@
 """Rodadas do Kurt para um cenário de simulação, e os resultados em P10, P50 e P90.
 
 Uma rodada executa o plano da aba Execução: para cada dia do plano e cada
-cenário de sorteio k (0 = determinístico, 1.. = dias históricos sorteados), grava
+cenário de sorteio k (com 1 cenário, k = 0, a forma típica; com N > 1, k = 1..N,
+dias históricos sorteados), grava
 a pasta do dia (``dia.py``) e chama o executável do Kurt (``KURT_APP_RODAR_DIA``,
 ``scripts/rodar_dia.sh`` do repositório do Kurt) com o contrato:
 
@@ -102,7 +103,7 @@ class Rodadas:
         tarefas = [
             {"data": p["data"], "peso": p["peso"], "tipo": p["tipo"], "cenario": k, "status": "na fila"}
             for p in plano
-            for k in range(op["cenarios"])
+            for k in cenarios_da_rodada(op["cenarios"])
         ]
         r = {
             "id": rid,
@@ -251,6 +252,15 @@ class Rodadas:
             "meses": meses,
             "usinas": usinas,
         }
+
+
+def cenarios_da_rodada(n: int) -> list[int]:
+    """Com um cenário, roda o determinístico (forma típica); com mais, só dias históricos sorteados.
+
+    A forma típica suaviza os picos de renováveis e subestima o corte (backtest de
+    14 a 20/11/2026), então ela não entra nos quantis quando há sorteio.
+    """
+    return [0] if n <= 1 else list(range(1, n + 1))
 
 
 def _contagem(r: dict) -> dict:
