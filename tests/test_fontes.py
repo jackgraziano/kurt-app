@@ -194,3 +194,31 @@ def test_myria_erro_sem_vazar_chave(chave):
     assert "404" in str(e.value) and "segredo" not in str(e.value)
     with pytest.raises(MyriaErro):
         Myria(api="https://exemplo", arquivo_chave=chave.parent / "nao-existe", transporte=Falso({})).estudo("x")
+
+
+def test_formas_capacidade(tmp_path):
+    base = {"via": "nome", "score": 1.0, "cap_mw": 10.0, "uf_grupo": "RN", "fonte": "EOL"}
+    linhas = [
+        {**base, "usina_id": "EOL-1", "id_ons": "X", "cap_ons_mw": 50.0, "cap_estimada_mw": 30.0, "cap_origem": "ons"},
+        {
+            **base,
+            "usina_id": "EOL-2",
+            "id_ons": None,
+            "cap_ons_mw": None,
+            "cap_estimada_mw": 30.0,
+            "cap_origem": "decks_dessem",
+        },
+        {
+            **base,
+            "usina_id": "EOL-3",
+            "id_ons": None,
+            "cap_ons_mw": None,
+            "cap_estimada_mw": None,
+            "cap_origem": "caso",
+        },
+    ]
+    pq.write_table(pa.Table.from_pylist(linhas), tmp_path / "mapa_usinas.parquet")
+    f = Formas(tmp_path)
+    assert f.capacidade("EOL-1") == (50.0, "ons")
+    assert f.capacidade("EOL-2") == (30.0, "decks_dessem")
+    assert f.capacidade("EOL-3") is None and f.capacidade("EOL-9") is None

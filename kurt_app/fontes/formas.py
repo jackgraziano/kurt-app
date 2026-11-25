@@ -13,10 +13,13 @@ gravados em ``dados/formas/``. Este módulo só os lê (e não acessa o NAS):
   capacidade médio por usina ou conjunto do ONS, por mês e hora.
 - ``fc_grupos.parquet`` (fonte, uf, mes, hora, fc): o mesmo por fonte e UF, ponderado pela
   capacidade (para usinas sem casamento); ``uf = "BR"`` é o país inteiro.
-- ``mapa_usinas.parquet`` (usina_id, id_ons, via, score, cap_mw, uf_grupo, fonte): usina do
+- ``mapa_usinas.parquet`` (usina_id, id_ons, via, score, cap_mw, uf_grupo, fonte, cap_ons_mw,
+  cap_estimada_mw, cap_origem): usina do
   caso base -> usina ou conjunto do ONS cujo perfil ela usa (``via``: nome, ponto_conexao ou
   grupo_fonte_uf; no último, ``uf_grupo`` é a UF da barra ou, sem ela, a UF de maior
-  capacidade da fonte no submercado).
+  capacidade da fonte no submercado). ``cap_ons_mw`` é a capacidade instalada do ONS da usina
+  casada; ``cap_estimada_mw``, o máximo da previsão em decks DESSEM recentes; ``cap_origem`` diz
+  qual vale (ons, decks_dessem ou caso).
 - ``dias.parquet`` (data, mes, tipo_dia, carga_<sub>, fc_<fonte>_<sub>): dias históricos
   com as 48 meias horas normalizadas, para sortear dias inteiros (carga e renováveis
   juntas, preservando a correlação).
@@ -149,6 +152,22 @@ class Formas:
             except KeyError:
                 continue
         raise KeyError(f"fc_grupos: sem perfil de {fonte} no mês {mes}")
+
+    def capacidade(self, usina_id: str) -> tuple[float, str] | None:
+        """Capacidade da usina (MW) e a origem: "ons" (instalada, da usina casada), "decks_dessem"
+        (máximo da previsão em decks recentes) ou None se o mapa não tiver nenhuma das duas."""
+        mapa = self.tabela("mapa_usinas")
+        if "cap_origem" not in mapa.column_names:
+            return None
+        sel = mapa.filter(pc.equal(mapa["usina_id"], usina_id))
+        if not sel.num_rows:
+            return None
+        r = sel.slice(0, 1).to_pylist()[0]
+        if r.get("cap_ons_mw"):
+            return float(r["cap_ons_mw"]), "ons"
+        if r.get("cap_estimada_mw"):
+            return float(r["cap_estimada_mw"]), "decks_dessem"
+        return None
 
     def dias(self, mes: int | None = None, tipo: str | None = None) -> pa.Table:
         """Dias históricos (para sorteio conjunto), filtrados por mês do ano e tipo de dia."""

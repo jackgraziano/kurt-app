@@ -40,6 +40,7 @@ from kurt_app.fontes.formas import SUBMERCADOS, TIPOS_DIA, tipo_dia  # noqa: E40
 SERIES = Path("/mnt/nas/personal_folder/setor-eletrico/collections/series")
 CARGA = SERIES / "ons-carga-dessem/derived/api_cargaverificada.csv.gz"
 MMGD = SERIES / "ons-geracao-renovavel/derived/mmgd_ons_subsistema.parquet"
+DECKS_DESSEM = Path("/mnt/nas/personal_folder/Decks/data/raw/ons/dessem/entrada-saida")
 FC_GLOB = str(SERIES / "public-ons/datasets/fator-capacidade-2/originals/*/*/FATOR_CAPACIDADE-2_*.parquet")
 AREA_SUB = {"SECO": "SE", "S": "S", "NE": "NE", "N": "N"}
 FONTE_FC = {"Eólica": "EOL", "Solar": "UFV"}
@@ -262,10 +263,42 @@ def fc_diario(t: pa.Table) -> dict[tuple[str, str, date], np.ndarray]:
     return {k: v for k, v in out.items() if not np.isnan(v).any()}
 
 
+# ---------------------------------------------------------------- capacidade estimada pelos decks DESSEM
+
+
+def cap_decks_dessem(n: int = 30) -> tuple[dict[str, float], list[str]]:
+    """Máximo da previsão de cada usina (código do renovaveis.dat) nos `n` decks DESSEM mais recentes.
+
+    O deck traz PMAX 9999; o máximo da previsão em várias semanas é uma estimativa (por baixo)
+    da capacidade."""
+    import zipfile
+
+    zips = sorted(DECKS_DESSEM.glob("*/*.zip"))[-n:]
+    cap: dict[str, float] = {}
+    for z in zips:
+        try:
+            with zipfile.ZipFile(z) as zf:
+                nome = next((x for x in zf.namelist() if x.lower().endswith("renovaveis.dat")), None)
+                if nome is None:
+                    continue
+                for ln in zf.read(nome).decode("latin-1").splitlines():
+                    if not ln.startswith("EOLICA-GERACAO"):
+                        continue
+                    c = ln.split(";")
+                    if len(c) < 9:
+                        continue
+                    cod, v = c[1].strip(), _f(c[8].strip())
+                    if v is not None and v > cap.get(cod, 0.0):
+                        cap[cod] = v
+        except (zipfile.BadZipFile, OSError):
+            continue
+    return cap, [z.name for z in zips]
+
+
 # ---------------------------------------------------------------- casamento com o caso base
 
 
-def mapear_usinas(cadastro: Path, atr: pa.Table) -> tuple[pa.Table, dict]:
+def mapear_usinas(cadastro: Path, atr: pa.Table, cap_dessem: dict[str, float] | None = None) -> tuple[pa.Table, dict]:
     us = [r for r in pq.read_table(cadastro / "usinas.parquet").to_pylist() if r["fonte_energia"] in ("EOL", "UFV")]
     barras = {b["barra_id"]: b for b in pq.read_table(cadastro / "barras.parquet").to_pylist()}
     ons = atr.to_pylist()
@@ -340,6 +373,29 @@ def mapear_usinas(cadastro: Path, atr: pa.Table) -> tuple[pa.Table, dict]:
         # da fonte no submercado; senão, a do país
         r["uf_grupo"] = uf if (f_, uf) in tem_grupo else uf_maior.get((f_, u.get("submercado"))) or uf_pais.get(f_)
         r["fonte"] = u["fonte_energia"]
+    # capacidade: a instalada do ONS quando casou com uma usina ou conjunto; senão o máximo da
+    # previsão nos decks DESSEM recentes; senão a do caso base
+    cap_ons = {o["id_ons"]: o["cap_mw"] for o in ons}
+    for r in linhas:
+        u = por_id[r["usina_id"]]
+        r["cap_ons_mw"] = cap_ons.get(r["id_ons"]) if r["id_ons"] else None
+        est = (cap_dessem or {}).get(str(u.get("cod_deck") or ""))
+        r["cap_estimada_mw"] = est
+    # várias usinas do caso podem casar com o mesmo conjunto do ONS: a capacidade do conjunto é
+    # repartida entre elas, na proporção da capacidade estimada (ou da do caso)
+    por_ons: dict[str, list[dict]] = defaultdict(list)
+    for r in linhas:
+        if r["cap_ons_mw"]:
+            por_ons[r["id_ons"]].append(r)
+    for grupo in por_ons.values():
+        if len(grupo) < 2:
+            continue
+        pesos = [r["cap_estimada_mw"] or por_id[r["usina_id"]]["cap_mw"] or 1.0 for r in grupo]
+        tot_p = sum(pesos)
+        for r, w in zip(grupo, pesos, strict=True):
+            r["cap_ons_mw"] = round(r["cap_ons_mw"] * w / tot_p, 3)
+    for r in linhas:
+        r["cap_origem"] = "ons" if r["cap_ons_mw"] else "decks_dessem" if r["cap_estimada_mw"] else "caso"
     tot = len(linhas)
     cap = sum(r["cap_mw"] or 0 for r in linhas)
     taxa = {}
@@ -383,6 +439,7 @@ def main() -> int:
     p.add_argument("--anos", type=int, default=3)
     p.add_argument("--saida", default=str(RAIZ / "dados" / "formas"))
     p.add_argument("--cadastro", default=str(RAIZ / "dados" / "cadastro" / "base-20261120"))
+    p.add_argument("--decks-dessem", type=int, default=30, help="decks DESSEM recentes para estimar a capacidade")
     p.add_argument("--fim", default=None, help="último dia do histórico (padrão: o mais recente disponível)")
     a = p.parse_args()
     saida = Path(a.saida)
@@ -414,9 +471,19 @@ def main() -> int:
     rel["fc"] = {"linhas_horarias": t_fc.num_rows, "usinas_ons": atr.num_rows, "grupos": grupos.num_rows}
 
     print("casamento com o caso base...", flush=True)
-    mapa, taxa = mapear_usinas(Path(a.cadastro), atr)
+    cap_dessem, zips = cap_decks_dessem(a.decks_dessem)
+    rel["cap_decks_dessem"] = {
+        "decks": len(zips),
+        "primeiro": zips[0] if zips else None,
+        "ultimo": zips[-1] if zips else None,
+        "usinas": len(cap_dessem),
+    }
+    mapa, taxa = mapear_usinas(Path(a.cadastro), atr, cap_dessem)
     pq.write_table(mapa, saida / "mapa_usinas.parquet")
     rel["casamento"] = taxa
+    rel["cap_origem"] = {
+        o: sum(1 for r in mapa.to_pylist() if r["cap_origem"] == o) for o in ("ons", "decks_dessem", "caso")
+    }
 
     print("dias...", flush=True)
     t_dias = tabela_dias(norm, fc_diario(t_fc))
