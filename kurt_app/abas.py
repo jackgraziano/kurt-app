@@ -115,11 +115,53 @@ def _op_carga(op: dict, _s: dict) -> dict:
     }
 
 
+FONTES_SENS = ("EOL", "UFV", "MMGD")
+SUBS_SENS = ("todos", "SE", "S", "NE", "N")
+
+
+def _sensibilidade(sens: Any) -> dict:
+    if sens in (None, {}):
+        return {"nivel": [], "forma": {}}
+    if not isinstance(sens, dict):
+        raise SimulacaoErro('opção sensibilidade: use {"nivel": [...], "forma": {...}}')
+    nivel = []
+    for i, r in enumerate(sens.get("nivel") or []):
+        onde = f"sensibilidade.nivel, item {i + 1}"
+        if not isinstance(r, dict) or r.get("fonte") not in FONTES_SENS:
+            raise SimulacaoErro(f"{onde}: fonte deve ser {', '.join(FONTES_SENS)}")
+        sub = r.get("submercado", "todos")
+        if sub not in SUBS_SENS:
+            raise SimulacaoErro(f"{onde}: submercado deve ser {', '.join(SUBS_SENS)}")
+        fator = _numero(r.get("fator"), f"{onde}, fator")
+        if not 0 <= fator <= 5:
+            raise SimulacaoErro(f"{onde}: fator {fator} fora de 0 a 5 (1 = sem mudança)")
+        meses = r.get("meses") or []
+        if not isinstance(meses, list) or any(not isinstance(m, str) or len(m) != 7 for m in meses):
+            raise SimulacaoErro(f"{onde}: meses deve ser uma lista de AAAA-MM")
+        if abs(fator - 1) > 1e-9:
+            nivel.append(
+                {"fonte": r["fonte"], "submercado": sub, "fator": fator, **({"meses": meses} if meses else {})}
+            )
+    forma = {}
+    for fonte, pesos in (sens.get("forma") or {}).items():
+        if fonte not in FONTES_SENS:
+            raise SimulacaoErro(f"sensibilidade.forma: fonte {fonte!r} inválida (use {', '.join(FONTES_SENS)})")
+        if not isinstance(pesos, list) or len(pesos) != 24:
+            raise SimulacaoErro(f"sensibilidade.forma.{fonte}: use 24 pesos, um por hora (1 = sem mudança)")
+        w = [_numero(v, f"sensibilidade.forma.{fonte}") for v in pesos]
+        if any(v < 0 or v > 5 for v in w) or not any(w):
+            raise SimulacaoErro(f"sensibilidade.forma.{fonte}: pesos de 0 a 5, nem todos zero")
+        if any(abs(v - 1) > 1e-9 for v in w):
+            forma[fonte] = w
+    return {"nivel": nivel, "forma": forma}
+
+
 def _op_renovaveis(op: dict, _s: dict) -> dict:
     return {
         "nivel": _escolha(op, "nivel", ("decomp", "capacidade"), "decomp"),
         "capacidade": _escolha(op, "capacidade", ("ons", "caso"), "ons"),
         "correcao_nivel": _escolha(op, "correcao_nivel", ("nenhuma", "historica"), "nenhuma"),
+        "sensibilidade": _sensibilidade(op.get("sensibilidade")),
     }
 
 
@@ -243,6 +285,10 @@ ABAS: dict[str, Aba] = {
             " quando a usina casou; 'caso' usa o cap_mw do caso de rede (no caso base, o máximo da previsão de um dia).",
             "opcoes.correcao_nivel: 'historica' multiplica os equivalentes do DECOMP pela razão histórica entre a"
             " previsão do DESSEM e o DECOMP (por fonte, submercado, mês e patamar); 'nenhuma' usa o DECOMP.",
+            "opcoes.sensibilidade.nivel: lista de {fonte: EOL | UFV | MMGD, submercado: todos | SE | S | NE | N,"
+            ' fator, meses (opcional, ["2027-01"])}; ex.: fator 1.1 = 10% mais geração. As regras se multiplicam.',
+            "opcoes.sensibilidade.forma: {fonte: 24 pesos horários}; muda a forma do dia sem mudar a energia,"
+            " ex.: pesos maiores das 10 às 15 h concentram a solar no meio-dia. Nenhuma usina passa da capacidade.",
         ),
     ),
     "termicas": Aba(

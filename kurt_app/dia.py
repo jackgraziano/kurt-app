@@ -67,7 +67,12 @@ def semana(sims: Simulacoes, s: dict, x: dict, cenario: int = 0) -> dict:
         da_semana("carga", "ande"),
         renov,
         usinas,
-        {"ajuste_carga": op_carga["ajuste"], "renovaveis_nivel": op_ren["nivel"], "semente": op_exec["semente"]},
+        {
+            "ajuste_carga": op_carga["ajuste"],
+            "renovaveis_nivel": op_ren["nivel"],
+            "semente": op_exec["semente"],
+            "sensibilidade": op_ren["sensibilidade"],
+        },
         cenario,
     )
     sem["usinas"] = {u["usina_id"]: u for u in usinas}

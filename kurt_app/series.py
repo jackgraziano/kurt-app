@@ -135,7 +135,8 @@ def semana(
     para a semana. ``usinas`` são as eólicas e solares vigentes (usina_id, fonte_energia,
     submercado, cap_mw, uf). ``opcoes``: ``ajuste_carga`` {sub: fator},
     ``renovaveis_nivel`` ("decomp" escala as usinas para bater com os equivalentes;
-    "capacidade" usa só capacidade × fator de capacidade histórico), ``semente``.
+    "capacidade" usa só capacidade × fator de capacidade histórico), ``semente`` e
+    ``sensibilidade`` (ajustes do usuário no nível e na forma, ver ``multiplicador``).
     """
     op = opcoes or {}
     dias = dias_da_semana(x["inicio"])
@@ -207,6 +208,15 @@ def semana(
             for i in ids:
                 out_ren[i] = out_ren[i] * k
             fatores[f"{s}|{fonte}"] = k
+    sens = op.get("sensibilidade") or {}
+    if sens:
+        caps = {u["usina_id"]: u["cap_mw"] or 0.0 for u in usinas}
+        for (s, fonte), ids in grupos.items():
+            mult = multiplicador(sens, fonte, s, dias, sum(out_ren[i] for i in ids))
+            for i in ids:
+                out_ren[i] = np.minimum(out_ren[i] * mult, caps[i])
+        for s, serie in out_mmgd.items():
+            out_mmgd[s] = serie * multiplicador(sens, "MMGD", s, dias, serie)
     return {
         "dias": [d.isoformat() for d in dias],
         "patamar": pat,
@@ -217,6 +227,31 @@ def semana(
         "fator_renovaveis": fatores,
         "fator_fora_da_faixa": fora,
     }
+
+
+def multiplicador(sens: dict, fonte: str, sub: str, dias: list[date], base: np.ndarray) -> np.ndarray:
+    """Multiplicador das sensibilidades do usuário para um grupo (fonte, submercado) na semana.
+
+    ``sens["forma"][fonte]``: 24 pesos horários; mudam a forma do dia sem mudar a energia
+    do grupo (o dia é reescalado). ``sens["nivel"]``: lista de {fonte, submercado ("todos"),
+    meses (opcional, AAAA-MM), fator}; muda a energia. As regras se multiplicam.
+    """
+    out = np.ones(7 * MEIAS)
+    pesos = (sens.get("forma") or {}).get(fonte)
+    if pesos:
+        w = np.repeat(np.array(pesos, dtype=float), 2)
+        for i in range(7):
+            fa = slice(i * MEIAS, (i + 1) * MEIAS)
+            b = base[fa]
+            novo = float((b * w).sum())
+            out[fa] = w * (float(b.sum()) / novo) if novo > 1e-9 else 1.0
+    for r in sens.get("nivel") or []:
+        if r["fonte"] != fonte or r.get("submercado", "todos") not in ("todos", sub):
+            continue
+        for i, d in enumerate(dias):
+            if not r.get("meses") or d.isoformat()[:7] in r["meses"]:
+                out[i * MEIAS : (i + 1) * MEIAS] *= float(r["fator"])
+    return out
 
 
 def _perfil_ou_plano(fn, s: str, mes: int, fonte: str) -> np.ndarray:

@@ -175,3 +175,8 @@ table.pivo th:first-child { text-align: left; }
 .legenda-grafico { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; margin: 10px 0 4px; }
 .legenda-grafico i { display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; }
 canvas.grafico-semana { width: 100%; height: 280px; background: #fff; border: 1px solid #e3e6eb; border-radius: 10px; }
+.pagina .cartao.largo { max-width: 860px; }
+table.sens { border-collapse: collapse; font-size: 12px; margin-bottom: 8px; }
+table.sens th { text-align: left; padding: 4px 8px; font-weight: 600; color: #344054; white-space: nowrap; }
+table.sens td { padding: 3px 4px; }
+table.sens input { width: 72px; }

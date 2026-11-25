@@ -368,6 +368,7 @@ export async function abrirAbaDecomp(el: HTMLElement, s: Simulacao, aba: string,
     ${campos.length ? `<form id="f-aba" class="cartao">${campos.map((c) => campoHtml(c, d.opcoes[c.nome])).join("")}<div><button class="primario">salvar</button></div></form>` : ""}
     ${(d.avisos ?? []).map((a) => `<p class="alerta">${esc(a)}</p>`).join("")}
     ${nSob ? `<p class="alerta">${nSob} valor(es) mudados à mão pelo JSON; o resto segue o DECOMP.</p>` : ""}
+    ${aba === "renovaveis" ? cartaoSensibilidade(d.opcoes.sensibilidade as Sensibilidade | undefined) : ""}
     <div id="painel-semana"></div>
     ${tabelasHtml(aba, d)}
   </div>`;
@@ -379,6 +380,16 @@ export async function abrirAbaDecomp(el: HTMLElement, s: Simulacao, aba: string,
     try {
       await api.subirInsumo(s.nome, aba, { formato: doc.formato, versao: doc.versao, insumo: aba, dados });
       aviso("aba salva");
+      await aoMudar();
+    } catch (err) {
+      aviso(String(err), true);
+    }
+  });
+  if (aba === "renovaveis") ligarSensibilidade(el, d.opcoes.sensibilidade as Sensibilidade | undefined, async (sens) => {
+    const dados = { ...d, opcoes: { ...d.opcoes, sensibilidade: sens } };
+    try {
+      await api.subirInsumo(s.nome, aba, { formato: doc.formato, versao: doc.versao, insumo: aba, dados });
+      aviso("sensibilidades salvas");
       await aoMudar();
     } catch (err) {
       aviso(String(err), true);
@@ -467,4 +478,89 @@ async function mostrarResultados(el: HTMLElement, s: Simulacao, id: string): Pro
     <div class="rolagem-x"><table class="pivo"><tr><th>usina</th><th>submercado</th><th>fonte</th><th>P10</th><th>P50</th><th>P90</th></tr>${r.usinas
       .map((u) => `<tr><th>${esc(u.usina_id)}</th><td>${esc(u.submercado)}</td><td>${esc(u.fonte)}</td>${q(u)}</tr>`)
       .join("")}</table></div>`;
+}
+
+// ---------- sensibilidades das renováveis (nível e forma) ----------
+interface RegraNivel {
+  fonte: string;
+  submercado: string;
+  fator: number;
+  meses?: string[];
+}
+interface Sensibilidade {
+  nivel: RegraNivel[];
+  forma: Record<string, number[]>;
+}
+
+const FONTES_SENS: [string, string][] = [
+  ["EOL", "Eólica"],
+  ["UFV", "Solar (UFV)"],
+  ["MMGD", "MMGD"],
+];
+const SUBS_SENS = ["todos", "SE", "S", "NE", "N"];
+const FAIXAS: [string, number, number][] = [
+  ["madrugada (0–6 h)", 0, 6],
+  ["manhã (6–10 h)", 6, 10],
+  ["meio-dia (10–15 h)", 10, 15],
+  ["tarde (15–18 h)", 15, 18],
+  ["noite (18–24 h)", 18, 24],
+];
+
+function cartaoSensibilidade(sens: Sensibilidade | undefined): string {
+  const nivel = sens?.nivel ?? [];
+  const pct = (fonte: string, sub: string) => {
+    const r = nivel.find((x) => x.fonte === fonte && x.submercado === sub && !x.meses?.length);
+    return r ? Math.round(r.fator * 1000) / 10 : 100;
+  };
+  const faixa = (fonte: string, a: number, b: number) => {
+    const w = sens?.forma?.[fonte];
+    if (!w) return 100;
+    const v = w.slice(a, b);
+    return Math.round((v.reduce((x, y) => x + y, 0) / v.length) * 1000) / 10;
+  };
+  const porMes = nivel.filter((x) => x.meses?.length).length;
+  return `<form id="f-sens" class="cartao largo">
+    <h3>Sensibilidades</h3>
+    <p class="sub">Partem da geração calibrada no DECOMP. <b>Nível</b>: % da energia (100 = sem mudança; "todos" vale para todos os submercados e se multiplica com o do submercado).
+    <b>Forma</b>: peso de cada faixa do dia; muda a hora da geração sem mudar a energia do dia. Nenhuma usina passa da capacidade.</p>
+    <h4>Nível (% da energia)</h4>
+    <table class="sens"><tr><th></th>${SUBS_SENS.map((s) => `<th>${s}</th>`).join("")}</tr>${FONTES_SENS.map(
+      ([f, r]) =>
+        `<tr><th>${r}</th>${SUBS_SENS.map((s) => `<td><input type="number" min="0" max="500" step="1" data-nivel="${f}|${s}" value="${pct(f, s)}" /></td>`).join("")}</tr>`,
+    ).join("")}</table>
+    ${porMes ? `<p class="sub">Há ${porMes} regra(s) por mês no JSON; elas são mantidas.</p>` : ""}
+    <h4>Forma (peso por faixa do dia, %)</h4>
+    <table class="sens"><tr><th></th>${FAIXAS.map(([r]) => `<th>${r}</th>`).join("")}</tr>${FONTES_SENS.map(
+      ([f, r]) =>
+        `<tr><th>${r}</th>${FAIXAS.map(([, a, b]) => `<td><input type="number" min="0" max="500" step="5" data-forma="${f}|${a}|${b}" value="${faixa(f, a, b)}" /></td>`).join("")}</tr>`,
+    ).join("")}</table>
+    <div><button class="primario">salvar sensibilidades</button> <button type="button" id="sens-zerar">voltar tudo para 100%</button></div>
+  </form>`;
+}
+
+function ligarSensibilidade(el: HTMLElement, sens: Sensibilidade | undefined, salvar: (s: Sensibilidade) => Promise<void>): void {
+  const f = el.querySelector<HTMLFormElement>("#f-sens");
+  if (!f) return;
+  el.querySelector("#sens-zerar")!.addEventListener("click", () => {
+    f.querySelectorAll<HTMLInputElement>("input").forEach((i) => (i.value = "100"));
+  });
+  f.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const nivel: RegraNivel[] = (sens?.nivel ?? []).filter((x) => x.meses?.length);
+    f.querySelectorAll<HTMLInputElement>("input[data-nivel]").forEach((i) => {
+      const [fonte, submercado] = i.dataset.nivel!.split("|");
+      const v = Number(i.value) / 100;
+      if (Math.abs(v - 1) > 1e-9) nivel.push({ fonte, submercado, fator: v });
+    });
+    const forma: Record<string, number[]> = {};
+    for (const [fonte] of FONTES_SENS) {
+      const w = new Array(24).fill(1);
+      f.querySelectorAll<HTMLInputElement>(`input[data-forma^="${fonte}|"]`).forEach((i) => {
+        const [, a, b] = i.dataset.forma!.split("|").map(Number);
+        for (let h = a; h < b; h++) w[h] = Number(i.value) / 100;
+      });
+      if (w.some((x) => Math.abs(x - 1) > 1e-9)) forma[fonte] = w;
+    }
+    void salvar({ nivel, forma });
+  });
 }

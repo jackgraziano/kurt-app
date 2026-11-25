@@ -250,3 +250,39 @@ def test_correcao_de_nivel_historica(cli, monkeypatch):
     assert cli.post("/api/simulacoes/s1/insumos/renovaveis", json=doc).status_code == 200
     depois = dia.semana(sims, sims.ler("s1"), x)["fator_renovaveis"]["NE|EOL"]
     assert depois == pytest.approx(1.5 * antes)
+
+
+def test_sensibilidade_nivel_e_forma(cli):
+    sims = cli.app.state.simulacoes
+    x = niveis.semanas(sims.ler("s1"))[0]
+    base = dia.semana(sims, sims.ler("s1"), x)
+    doc = cli.get("/api/simulacoes/s1/insumos/renovaveis").json()
+    pesos = [1.0] * 24
+    for h in range(10, 15):
+        pesos[h] = 3.0
+    doc["dados"]["opcoes"]["sensibilidade"] = {
+        "nivel": [{"fonte": "MMGD", "submercado": "SE", "fator": 1.2}],
+        "forma": {"MMGD": pesos},
+    }
+    assert cli.post("/api/simulacoes/s1/insumos/renovaveis", json=doc).status_code == 200
+    sem = dia.semana(sims, sims.ler("s1"), x)
+    # nível: +20% de energia; forma: mais peso das 10 às 15 h, energia do dia mantida
+    assert sem["mmgd"]["SE"].sum() == pytest.approx(1.2 * base["mmgd"]["SE"].sum())
+    meio_dia = slice(20, 30)
+    assert sem["mmgd"]["SE"][meio_dia].sum() / sem["mmgd"]["SE"][:48].sum() > (
+        base["mmgd"]["SE"][meio_dia].sum() / base["mmgd"]["SE"][:48].sum()
+    )
+    # nenhuma usina passa da capacidade
+    caps = {u: v["cap_mw"] for u, v in sem["usinas"].items()}
+    assert all((sem["renovaveis"][u] <= caps[u] + 1e-9).all() for u in caps)
+
+
+def test_sensibilidade_invalida_nao_grava(cli):
+    antes = cli.get("/api/simulacoes/s1").json()
+    doc = cli.get("/api/simulacoes/s1/insumos/renovaveis").json()
+    doc["dados"]["opcoes"]["sensibilidade"] = {"forma": {"UFV": [1.0] * 23}}
+    r = cli.post("/api/simulacoes/s1/insumos/renovaveis", json=doc)
+    assert r.status_code == 422 and "24 pesos" in r.json()["detail"]
+    doc["dados"]["opcoes"]["sensibilidade"] = {"nivel": [{"fonte": "EOL", "fator": 9}]}
+    assert cli.post("/api/simulacoes/s1/insumos/renovaveis", json=doc).status_code == 422
+    assert cli.get("/api/simulacoes/s1").json() == antes
