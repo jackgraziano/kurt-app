@@ -1,6 +1,6 @@
 import { api } from "./api";
-import type { DadosAba, DocInsumo, Linha, SemanaSeries, Simulacao } from "./tipos";
-import { aviso, esc, fmtData } from "./util";
+import type { DadosAba, DocInsumo, Linha, Resultados, RodadaResumo, SemanaSeries, Simulacao } from "./tipos";
+import { aviso, esc, fmtData, rotuloMes } from "./util";
 
 // Abas cujo nível vem dos decks DECOMP: Carga, Renováveis, Térmicas, Hidro, Valor da
 // água e Execução. Cada uma mostra as opções (formulário), os avisos, um resumo das
@@ -337,6 +337,87 @@ export async function abrirAbaDecomp(el: HTMLElement, s: Simulacao, aba: string,
       aviso(String(err), true);
     }
   });
+  if (aba === "execucao") await painelRodadas(el.querySelector("#painel-semana")!, s);
   if ((aba === "carga" || aba === "renovaveis") && semanas.length)
     await painelSemana(el.querySelector("#painel-semana")!, s, aba, semanas, exec?.cenarios ?? 5);
+}
+
+// ---------- rodadas e resultados (aba Execução) ----------
+let vigia = 0;
+
+async function painelRodadas(el: HTMLElement, s: Simulacao): Promise<void> {
+  window.clearTimeout(vigia);
+  let lista: RodadaResumo[] = [];
+  try {
+    lista = await api.rodadas(s.nome);
+  } catch (err) {
+    el.innerHTML = `<p class="erro">${esc(String(err))}</p>`;
+    return;
+  }
+  const ativa = lista.find((r) => r.status === "rodando");
+  el.innerHTML = `<h3>Rodadas</h3>
+    <p><button class="primario" id="disparar" ${ativa ? "disabled" : ""}>disparar rodada</button>
+    ${ativa ? `<button class="perigo" id="cancelar">cancelar a rodada em andamento</button>` : ""}</p>
+    ${
+      lista.length
+        ? `<table class="insumos">${lista
+            .map((r) => {
+              const c = r.contagem;
+              const pct = Math.round((100 * (c.ok + c.erro + c.cancelada)) / Math.max(c.total, 1));
+              return `<tr><th>${esc(r.id)}</th><td>${esc(r.status)} · ${c.ok} ok, ${c.erro} com erro, ${c.rodando} rodando, ${c["na fila"]} na fila (${pct}%)</td>
+                <td><button data-res="${esc(r.id)}" ${c.ok ? "" : "disabled"}>ver resultados</button></td></tr>`;
+            })
+            .join("")}</table>`
+        : `<p class="sub">Nenhuma rodada ainda. Cada rodada executa o plano abaixo: uma pasta do dia por dia e cenário, e o Kurt em cada uma.</p>`
+    }
+    <div id="resultados"></div>`;
+  el.querySelector("#disparar")?.addEventListener("click", async () => {
+    try {
+      await api.dispararRodada(s.nome);
+      aviso("rodada disparada");
+      await painelRodadas(el, s);
+    } catch (err) {
+      aviso(String(err), true);
+    }
+  });
+  el.querySelector("#cancelar")?.addEventListener("click", async () => {
+    if (!ativa || !window.confirm("Cancelar a rodada em andamento? As tarefas prontas ficam.")) return;
+    try {
+      await api.cancelarRodada(s.nome, ativa.id);
+      await painelRodadas(el, s);
+    } catch (err) {
+      aviso(String(err), true);
+    }
+  });
+  el.querySelectorAll<HTMLButtonElement>("button[data-res]").forEach((b) =>
+    b.addEventListener("click", () => void mostrarResultados(el.querySelector("#resultados")!, s, b.dataset.res!)),
+  );
+  if (ativa && document.body.contains(el)) vigia = window.setTimeout(() => void painelRodadas(el, s), 5000);
+}
+
+async function mostrarResultados(el: HTMLElement, s: Simulacao, id: string): Promise<void> {
+  el.innerHTML = `<p class="sub">carregando…</p>`;
+  let r: Resultados;
+  try {
+    r = await api.resultados(s.nome, id);
+  } catch (err) {
+    el.innerHTML = `<p class="erro">${esc(String(err))}</p>`;
+    return;
+  }
+  const q = (x: { p10: number; p50: number; p90: number }) =>
+    `<td>${x.p10.toFixed(1)}</td><td><b>${x.p50.toFixed(1)}</b></td><td>${x.p90.toFixed(1)}</td>`;
+  const subs = ["SIN", "SE", "S", "NE", "N"];
+  const linhas = r.meses
+    .filter((m) => subs.includes(m.submercado))
+    .sort((a, b) => a.mes.localeCompare(b.mes) || subs.indexOf(a.submercado) - subs.indexOf(b.submercado) || a.tipo.localeCompare(b.tipo))
+    .map((m) => `<tr><th>${rotuloMes(m.mes)}</th><td>${esc(m.submercado)}</td><td>${esc(m.tipo)}</td>${q(m)}</tr>`)
+    .join("");
+  el.innerHTML = `<h3>Resultados da rodada ${esc(r.id)}</h3>
+    <p class="sub">Corte de eólicas e solares em ${esc(r.unidade)} por mês, entre ${r.cenarios} cenário(s). ${r.contagem.ok} de ${r.contagem.total} tarefas ok.
+    ENE = corte energético; rede = por restrição elétrica.</p>
+    <div class="rolagem-x"><table class="pivo"><tr><th>mês</th><th>submercado</th><th>tipo</th><th>P10</th><th>P50</th><th>P90</th></tr>${linhas}</table></div>
+    <h4>Usinas com mais corte (P50 do horizonte)</h4>
+    <div class="rolagem-x"><table class="pivo"><tr><th>usina</th><th>submercado</th><th>fonte</th><th>P10</th><th>P50</th><th>P90</th></tr>${r.usinas
+      .map((u) => `<tr><th>${esc(u.usina_id)}</th><td>${esc(u.submercado)}</td><td>${esc(u.fonte)}</td>${q(u)}</tr>`)
+      .join("")}</table></div>`;
 }

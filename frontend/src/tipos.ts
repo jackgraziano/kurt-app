@@ -240,3 +240,30 @@ export interface DadosAba {
   resumo?: { dias: number; rodadas: number };
   [tabela: string]: unknown;
 }
+
+// rodadas do Kurt
+export interface RodadaResumo {
+  id: string;
+  cenario: string;
+  criada_em: string;
+  terminada_em?: string;
+  status: string;
+  contagem: { total: number; ok: number; erro: number; rodando: number; "na fila": number; cancelada: number };
+}
+
+export interface Quantis {
+  p10: number;
+  p50: number;
+  p90: number;
+  media: number;
+}
+
+export interface Resultados {
+  id: string;
+  status: string;
+  contagem: RodadaResumo["contagem"];
+  cenarios: number;
+  unidade: string;
+  meses: (Quantis & { mes: string; submercado: string; tipo: string })[];
+  usinas: (Quantis & { usina_id: string; submercado: string; fonte: string })[];
+}

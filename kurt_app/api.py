@@ -27,6 +27,7 @@ from .importar import eventos_de_linhas, eventos_de_usinas
 from .insumo_json import exportar as exportar_insumo
 from .insumo_json import importar as importar_insumo
 from .layout import CENTRO_UF, contornos_uf
+from .rodada import Rodadas, apagar_rodadas
 from .simulacao import INSUMOS, SimulacaoErro, Simulacoes
 from .validar import relatorio, validar
 
@@ -67,6 +68,8 @@ def criar_app(
     app = FastAPI(title="kurt-app", version=__version__)
     app.state.cenarios = cenarios
     app.state.simulacoes = simulacoes
+    rodadas = Rodadas(simulacoes)
+    app.state.rodadas = rodadas
 
     def cad(nome: str | None) -> Cadastro:
         with _erros(f"cenário {nome} não existe", f"cenário {nome} não se aplica: "):
@@ -267,10 +270,40 @@ def criar_app(
         with _erros(f"cenário {nome} não existe"):
             return resumo_semana(simulacoes, nome, inicio, cenario)
 
+    # -- rodadas do Kurt -------------------------------------------------------
+    @app.get("/api/simulacoes/{nome}/rodadas")
+    def listar_rodadas(nome: str):
+        with _erros(f"cenário {nome} não existe"):
+            return rodadas.listar(nome)
+
+    @app.post("/api/simulacoes/{nome}/rodadas", status_code=201)
+    def disparar_rodada(nome: str):
+        """Dispara o plano da aba Execução em segundo plano; acompanhe pelo GET da rodada."""
+        with _erros(f"cenário {nome} não existe"):
+            return rodadas.disparar(nome)
+
+    @app.get("/api/simulacoes/{nome}/rodadas/{rid}")
+    def ler_rodada(nome: str, rid: str):
+        with _erros(f"rodada {rid} não existe"):
+            return rodadas.ler(nome, rid)
+
+    @app.post("/api/simulacoes/{nome}/rodadas/{rid}/cancelar")
+    def cancelar_rodada(nome: str, rid: str):
+        with _erros(f"rodada {rid} não existe"):
+            return rodadas.cancelar(nome, rid)
+
+    @app.get("/api/simulacoes/{nome}/rodadas/{rid}/resultados")
+    def resultados_rodada(nome: str, rid: str):
+        with _erros(f"rodada {rid} não existe"):
+            return rodadas.resultados(nome, rid)
+
     @app.delete("/api/simulacoes/{nome}", status_code=204)
     def apagar_simulacao(nome: str):
         with _erros(f"cenário {nome} não existe"):
+            if any(r["status"] == "rodando" for r in rodadas.listar(nome)):
+                raise SimulacaoErro(f"há uma rodada em andamento em {nome}: cancele-a antes de apagar")
             simulacoes.apagar(nome)
+            apagar_rodadas(simulacoes, nome)
 
     @app.get("/api/ufs")
     def ufs():

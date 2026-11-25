@@ -102,6 +102,7 @@ Todas as consultas de rede aceitam `?cenario=<caso de rede>` (padrão `base`).
 | `GET /api/decks/fontes` | fontes de decks DECOMP configuradas |
 | `GET /api/decks?tipo&caminho&inicio&fim` | decks de uma fonte e o mapa semana → deck |
 | `GET /api/simulacoes/{nome}/semana?inicio&cenario` | séries semi-horárias de uma semana (gráficos de Carga e Renováveis) |
+| `GET/POST /api/simulacoes/{nome}/rodadas`, `GET .../rodadas/{id}`, `POST .../rodadas/{id}/cancelar`, `GET .../rodadas/{id}/resultados` | rodadas do Kurt e resultados P10/P50/P90 |
 | `GET /api/ufs`, `GET /api/esquema` | contorno das UFs e esquema das tabelas |
 
 ## Como rodar
@@ -133,6 +134,7 @@ Dados locais, fora do git (`dados/`):
 | `dados/simulacoes/<cadastro>/` | cenários de simulação, um JSON por cenário | `KURT_APP_SIMULACOES` |
 | pastas de decks DECOMP (uma subpasta ou .zip por deck) | fontes da aba Decks | `KURT_APP_DECKS` (separadas por `:`) |
 | decks oficiais do ONS (`<ano>/<AAAAMMDD>__DEC_ONS_..._VE.zip`) | fonte da aba Decks, para backtest | `KURT_APP_DECKS_ONS` |
+| executável que roda um dia no Kurt (`scripts/rodar_dia.sh` do Kurt) | disparo de rodadas | `KURT_APP_RODAR_DIA` |
 
 ## Fixture
 

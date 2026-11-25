@@ -97,4 +97,5 @@ Há um datalake do setor elétrico em `/mnt/nas`, na máquina Linux. Todo agente
 - **Pasta do dia:** `kurt-app dia <cenário> <AAAA-MM-DD> <saida> [--cenario k]` (`dia.py`) grava tudo o que o Kurt recebe para um dia: séries de carga, MMGD, ANDE e renováveis por usina, térmicas, vazões, volumes, FCF e a rede vigente. É o contrato com o gerador de deck do Kurt.
 - **Myria:** `fontes/myria.py` só lê (GET). A chave fica num arquivo na máquina Linux (caminho em `KURT_APP_MYRIA_CHAVE`); nunca a imprima, copie nem grave.
 - **Fontes de decks** são configuradas por ambiente: `KURT_APP_DECKS` (pastas, separadas por `:`) e `KURT_APP_DECKS_ONS` (raiz dos decks oficiais, `.../ons/decomp/valor-esperado`).
-- **Ainda não existem:** o gerador de deck a partir da pasta do dia (no Kurt) e o disparo de rodadas.
+- **Rodadas** (`rodada.py`): a aba Execução dispara o plano (dias × cenários) em segundo plano. Cada tarefa grava a pasta do dia e chama `KURT_APP_RODAR_DIA` (`scripts/rodar_dia.sh` do Kurt) com o contrato `<pasta_do_dia> <saida>` → `corte.csv`, `resumo.json` e `log.txt`. Os resultados são P10, P50 e P90 entre cenários, em GWh, por mês, submercado, tipo (ENE e rede) e usina.
+- **Ainda não existe:** o `rodar_dia.sh` de verdade (gerador de deck do dia, branch feat/deck-dia do Kurt).
