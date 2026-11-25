@@ -6,7 +6,8 @@ Uso (na máquina Linux, com o NAS montado; leva alguns minutos):
 
 Fontes (só leitura):
 - carga: ons-carga-dessem/derived/api_cargaverificada.csv.gz (API de carga verificada do ONS,
-  30 min, áreas SECO/S/NE/N; usa a carga global sem MMGD);
+  30 min, áreas SECO/S/NE/N; usa a carga global com MMGD, que é o que o DP do DECOMP e do DESSEM
+  representa: a MMGD entra nos decks como geração, não abatida da carga);
 - MMGD: ons-geracao-renovavel/derived/mmgd_ons_subsistema.parquet (30 min, por submercado);
 - fator de capacidade: public-ons/datasets/fator-capacidade-2 (horário, por usina ou conjunto
   eólico e solar, com geração verificada e capacidade instalada).
@@ -58,7 +59,10 @@ def _f(s: str) -> float | None:
 
 
 def carga_diaria(inicio: date) -> dict[tuple[str, date], np.ndarray]:
-    """(submercado, dia) -> 48 valores de carga sem MMGD (MW), só dias completos."""
+    """(submercado, dia) -> 48 valores de carga global com MMGD (MW), só dias completos.
+
+    A carga sem MMGD (líquida) tem a "barriga" do meio-dia: escalada para a média do DP do DECOMP, que é bruto,
+    deixava a noite alta e o meio-dia baixo em ~6 GW no SE (backtest de 14 a 20/11/2026)."""
     acc: dict[tuple[str, date], np.ndarray] = {}
     with gzip.open(CARGA, "rt", newline="") as fh:
         for r in csv.DictReader(fh, delimiter=";"):
@@ -67,10 +71,9 @@ def carga_diaria(inicio: date) -> dict[tuple[str, date], np.ndarray]:
                 continue
             fim_utc = datetime.fromisoformat(r["din_referenciautc"].replace("Z", "+00:00")).replace(tzinfo=None)
             ini_local = fim_utc - timedelta(minutes=30) + FUSO
-            v = _f(r["val_cargaglobalsmmgd"])
+            v = _f(r["val_cargaglobal"])
             if v is None:
-                cons, mmgd = _f(r["val_cargaglobalcons"]), _f(r["val_cargammgd"]) or 0.0
-                v = None if cons is None else cons - mmgd
+                v = _f(r["val_cargaglobalcons"])
             if v is None or v <= 0:
                 continue
             k = (sub, ini_local.date())
