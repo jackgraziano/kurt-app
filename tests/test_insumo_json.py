@@ -91,9 +91,7 @@ def test_subir_rede_invalida(cli, mexer, trecho):
     assert cli.get("/api/simulacoes/s1").json()["insumos"]["rede"]["caso"] == "expansao"
 
 
-def test_aba_generica(cli):
-    doc = cli.get("/api/simulacoes/s1/insumos/carga").json()
-    assert doc["dados"] == {}
-    doc["dados"] = {"fonte": "PLAN 2026-2030", "ajuste_pct": 2}
-    assert cli.post("/api/simulacoes/s1/insumos/carga", json=doc).json()["insumos"]["carga"]["ajuste_pct"] == 2
+def test_aba_sem_decks(cli):
+    r = cli.get("/api/simulacoes/s1/insumos/carga")
+    assert r.status_code == 422 and "aba Decks" in r.json()["detail"]
     assert cli.get("/api/simulacoes/s1/insumos/vento").status_code == 404

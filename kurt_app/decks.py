@@ -201,7 +201,7 @@ AJUDA_DECKS = [
     " Para forçar outro deck numa semana, troque 'deck' (o id aparece em 'decks_disponiveis') e 'estagio'.",
     "Apague 'semanas' para o app refazer o mapa sozinho a partir da fonte.",
     "'repetido': true marca semanas sem deck do próprio mês, que repetem um deck anterior.",
-    "'decks_disponiveis' e 'avisos' são só informativos; são ignorados na subida.",
+    "'decks_disponiveis', 'caminhos' e 'avisos' são só informativos; são ignorados na subida.",
 ]
 
 
@@ -244,7 +244,13 @@ def montar(s: dict, dados: dict) -> dict:
         semanas = _validar_semanas(dados["semanas"], esperadas, {d.id for d in decks})
     else:
         semanas = mapear(esperadas, decks, so_rv0)
-    return {"fonte": {"tipo": fonte["tipo"], "caminho": fonte["caminho"]}, "so_rv0": so_rv0, "semanas": semanas}
+    usados = {x["deck"] for x in semanas}
+    return {
+        "fonte": {"tipo": fonte["tipo"], "caminho": fonte["caminho"]},
+        "so_rv0": so_rv0,
+        "semanas": semanas,
+        "caminhos": {d.id: d.caminho for d in decks if d.id in usados},
+    }
 
 
 def avisos(insumo: dict, s: dict) -> list[str]:

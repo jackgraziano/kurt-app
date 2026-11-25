@@ -101,6 +101,7 @@ Todas as consultas de rede aceitam `?cenario=<caso de rede>` (padrão `base`).
 | `POST /api/simulacoes/{nome}/insumos/{aba}` | sobe o JSON da aba |
 | `GET /api/decks/fontes` | fontes de decks DECOMP configuradas |
 | `GET /api/decks?tipo&caminho&inicio&fim` | decks de uma fonte e o mapa semana → deck |
+| `GET /api/simulacoes/{nome}/semana?inicio&cenario` | séries semi-horárias de uma semana (gráficos de Carga e Renováveis) |
 | `GET /api/ufs`, `GET /api/esquema` | contorno das UFs e esquema das tabelas |
 
 ## Como rodar

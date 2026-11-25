@@ -163,3 +163,15 @@ table.semanas-decks td.repetido { background: #f9eeda; }
 table.semanas-decks select { max-width: 180px; font-size: 12px; }
 table.semanas-decks .estagio { display: flex; flex-direction: row; align-items: center; gap: 4px; margin-top: 4px; }
 table.semanas-decks .estagio input { width: 48px; }
+
+/* abas que vêm do DECOMP */
+table.pivo { border-collapse: collapse; font-size: 12px; background: #fff; }
+table.pivo th, table.pivo td { padding: 4px 10px; border-bottom: 1px solid #eef0f3; text-align: right; white-space: nowrap; }
+table.pivo tr:first-child th { color: #667085; font-weight: 600; }
+table.pivo th:first-child { text-align: left; }
+.pagina h4 { margin: 14px 0 6px; font-size: 13px; color: #344054; }
+.controles-grafico { display: flex; gap: 16px; align-items: end; flex-wrap: wrap; font-size: 12px; }
+.controles-grafico label { display: flex; flex-direction: column; gap: 4px; }
+.legenda-grafico { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; margin: 10px 0 4px; }
+.legenda-grafico i { display: inline-block; width: 14px; height: 3px; margin-right: 6px; vertical-align: middle; }
+canvas.grafico-semana { width: 100%; height: 280px; background: #fff; border: 1px solid #e3e6eb; border-radius: 10px; }

@@ -1,0 +1,212 @@
+"""Abas que vêm do DECOMP (carga, renováveis, térmicas, hidro, valor da água, execução)
+e a pasta do dia que o Kurt recebe. Usa o deck mínimo e formas sintéticas."""
+
+import json
+import shutil
+from datetime import date
+from pathlib import Path
+
+import numpy as np
+import pyarrow as pa
+import pyarrow.parquet as pq
+import pytest
+from fastapi.testclient import TestClient
+
+from kurt_app import dia, niveis, series
+from kurt_app.api import criar_app
+from kurt_app.fontes.formas import tipo_dia
+
+RAIZ = Path(__file__).resolve().parent.parent
+FIXTURE = RAIZ / "fixtures" / "acu3_20260910"
+MINI = RAIZ / "fixtures" / "decomp_mini"
+SUBS = ("SE", "S", "NE", "N")
+
+
+def _formas(pasta: Path) -> None:
+    pasta.mkdir()
+    meses = (11, 12)
+    forma = 1 + 0.3 * np.sin(np.linspace(0, 2 * np.pi, 48, endpoint=False) - np.pi / 2)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {"submercado": s, "mes": m, "tipo_dia": t, "meia_hora": h, "fator": float(forma[h] * k)}
+                for s in SUBS
+                for m in meses
+                for t, k in (("util", 1.05), ("sabado", 0.95), ("domingo", 0.85))
+                for h in range(48)
+            ]
+        ),
+        pasta / "carga.parquet",
+    )
+    sol = np.clip(np.sin(np.linspace(-np.pi / 2, 3 * np.pi / 2, 48, endpoint=False)), 0, None) * 3
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {"submercado": s, "fonte": "UFV", "mes": m, "meia_hora": h, "fc": float(sol[h])}
+                for s in SUBS
+                for m in meses
+                for h in range(48)
+            ]
+        ),
+        pasta / "mmgd.parquet",
+    )
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {"fonte": f, "uf": "BR", "mes": m, "hora": h, "fc": float(v)}
+                for f, v in (("EOL", 0.45), ("UFV", 0.25))
+                for m in meses
+                for h in range(24)
+            ]
+        ),
+        pasta / "fc_grupos.parquet",
+    )
+    pq.write_table(
+        pa.table(
+            {
+                "usina_id": pa.array([], pa.string()),
+                "id_ons": pa.array([], pa.string()),
+                "via": pa.array([], pa.string()),
+                "fonte": pa.array([], pa.string()),
+                "uf_grupo": pa.array([], pa.string()),
+            }
+        ),
+        pasta / "mapa_usinas.parquet",
+    )
+    rng = np.random.default_rng(1)
+    linhas = []
+    for d in range(1, 29):
+        dd = date(2025, 12, d)
+        r = {"data": dd, "mes": 12, "tipo_dia": tipo_dia(dd)}
+        for s in SUBS:
+            r[f"carga_{s}"] = (forma * rng.uniform(0.9, 1.1)).tolist()
+            r[f"fc_EOL_{s}"] = (np.full(48, 0.45) * rng.uniform(0.5, 1.5)).tolist()
+        linhas.append(r)
+    pq.write_table(pa.Table.from_pylist(linhas), pasta / "dias.parquet")
+
+
+@pytest.fixture
+def cli(tmp_path, monkeypatch):
+    decks = tmp_path / "decks"
+    shutil.copytree(MINI, decks / "DC122026")
+    _formas(tmp_path / "formas")
+    monkeypatch.setenv("KURT_APP_FORMAS", str(tmp_path / "formas"))
+    niveis._formas.cache_clear()
+    c = TestClient(criar_app(FIXTURE, tmp_path / "cen", tmp_path / "sim"))
+    r = c.post(
+        "/api/simulacoes",
+        json={
+            "nome": "s1",
+            "inicio": "2026-12-01",
+            "fim": "2026-12-31",
+            "decks": {"fonte": {"tipo": "pasta", "caminho": str(decks)}},
+        },
+    )
+    assert r.status_code == 201, r.text
+    return c
+
+
+ABAS = ("carga", "renovaveis", "termicas", "hidro", "valor_agua", "execucao")
+
+
+@pytest.mark.parametrize("aba", ABAS)
+def test_ida_e_volta(cli, aba):
+    doc = cli.get(f"/api/simulacoes/s1/insumos/{aba}").json()
+    r = cli.post(f"/api/simulacoes/s1/insumos/{aba}", json=doc)
+    assert r.status_code == 200, r.text
+    assert r.json()["insumos"][aba]["sobrescritos"] == {}
+    doc2 = cli.get(f"/api/simulacoes/s1/insumos/{aba}").json()
+    assert doc2["dados"] == doc["dados"]
+
+
+def test_carga_sobrescrito_so_do_que_mudou(cli):
+    doc = cli.get("/api/simulacoes/s1/insumos/carga").json()
+    carga = doc["dados"]["carga"]
+    assert {r["submercado"] for r in carga} == set(SUBS)
+    alvo = next(r for r in carga if r["submercado"] == "NE" and r["patamar"] == 1)
+    alvo["mwmed"] = 20000.0
+    r = cli.post("/api/simulacoes/s1/insumos/carga", json=doc)
+    sob = r.json()["insumos"]["carga"]["sobrescritos"]
+    assert sob == {"carga": [{"semana": alvo["semana"], "submercado": "NE", "patamar": 1, "mwmed": 20000.0}]}
+
+
+def test_subida_invalida_nao_grava(cli):
+    antes = cli.get("/api/simulacoes/s1").json()
+    doc = cli.get("/api/simulacoes/s1/insumos/carga").json()
+    doc["dados"]["carga"][0]["semana"] = "2030-01-05"
+    r = cli.post("/api/simulacoes/s1/insumos/carga", json=doc)
+    assert r.status_code == 422 and "não existe no DECOMP" in r.json()["detail"]
+    doc = cli.get("/api/simulacoes/s1/insumos/carga").json()
+    doc["dados"]["carga"][0]["mwmed"] = "muito"
+    assert cli.post("/api/simulacoes/s1/insumos/carga", json=doc).status_code == 422
+    doc = cli.get("/api/simulacoes/s1/insumos/execucao").json()
+    doc["dados"]["opcoes"]["dias"] = "alguns"
+    assert cli.post("/api/simulacoes/s1/insumos/execucao", json=doc).status_code == 422
+    assert cli.get("/api/simulacoes/s1").json() == antes
+
+
+def test_series_batem_com_o_decomp(cli):
+    sims = cli.app.state.simulacoes
+    s = sims.ler("s1")
+    x = niveis.semanas(s)[0]
+    sem = dia.semana(sims, s, x)
+    pat = sem["patamar"]
+    horas = x["horas"]
+    assert [(pat == p).sum() for p in (1, 2, 3)] == [round(336 * h / sum(horas)) for h in horas]
+    carga = [r for r in niveis.tabela(s, "carga") if r["semana"] == x["inicio"]]
+    for r in carga:
+        assert sem["carga"][r["submercado"]][pat == r["patamar"]].mean() == pytest.approx(r["mwmed"])
+    # renováveis: a energia da semana das usinas do NE bate com a do equivalente do DECOMP
+    eq = {}
+    for r in niveis.tabela(s, "renovaveis"):
+        if r["semana"] == x["inicio"] and r["submercado"] == "NE" and r["fonte"] == "EOL":
+            eq[r["patamar"]] = eq.get(r["patamar"], 0) + r["mwmed"]
+    cad = sims.casos_rede.cadastro("base")
+    ids = [u["usina_id"] for u in cad.renovaveis(x["inicio"]) if u["fonte_energia"] == "EOL"]
+    soma = sum(sem["renovaveis"][i] for i in ids)
+    assert soma.sum() == pytest.approx(sum(v * (pat == p).sum() for p, v in eq.items()))
+    # dia útil acima do domingo (a forma vem do histórico)
+    dias = sem["dias"]
+    util = next(i for i, d in enumerate(dias) if d == "2026-12-02")
+    dom = next(i for i, d in enumerate(dias) if d == "2026-11-29")
+    se = sem["carga"]["SE"]
+    assert se[util * 48 : util * 48 + 48].mean() > se[dom * 48 : dom * 48 + 48].mean()
+
+
+def test_cenarios_sorteados_mudam_e_ficam_perto_do_decomp(cli):
+    sims = cli.app.state.simulacoes
+    s = sims.ler("s1")
+    x = niveis.semanas(s)[0]
+    det = dia.semana(sims, s, x, 0)["carga"]["SE"].mean()
+    cen = [dia.semana(sims, s, x, k)["carga"]["SE"].mean() for k in range(1, 6)]
+    assert len(set(np.round(cen, 3))) > 1
+    assert np.mean(cen) == pytest.approx(det, rel=0.05)
+
+
+def test_exportar_dia(cli, tmp_path):
+    sims = cli.app.state.simulacoes
+    info = dia.exportar_dia(sims, "s1", "2026-12-02", 0, tmp_path / "dia")
+    arqs = {p.name for p in (tmp_path / "dia").iterdir()}
+    assert {"dia.json", "carga.parquet", "renovaveis.parquet", "termicas.parquet", "barras.parquet"} <= arqs
+    assert len(info["patamar"]) == 48 and info["deck"] == "DC122026"
+    assert info["avisos"]  # o deck mínimo não tem FCF
+    carga = pq.read_table(tmp_path / "dia" / "carga.parquet")
+    assert carga.num_rows == 48 * 5
+    assert json.loads((tmp_path / "dia" / "dia.json").read_text())["data"] == "2026-12-02"
+
+
+def test_plano_de_execucao(cli):
+    doc = cli.get("/api/simulacoes/s1/insumos/execucao").json()
+    plano = doc["dados"]["plano"]
+    assert [p["tipo"] for p in plano] == ["util", "sabado", "domingo"]
+    assert sum(p["peso"] for p in plano) == 31
+    doc["dados"]["opcoes"]["dias"] = "todos"
+    doc["dados"]["opcoes"]["cenarios"] = 2
+    cli.post("/api/simulacoes/s1/insumos/execucao", json=doc)
+    doc = cli.get("/api/simulacoes/s1/insumos/execucao").json()
+    assert doc["dados"]["resumo"] == {"dias": 31, "rodadas": 62}
+
+
+def test_patamares():
+    pat = series.patamares(np.arange(10.0), [2, 3, 5])
+    assert pat.tolist() == [3, 3, 3, 3, 3, 2, 2, 2, 1, 1]

@@ -1,4 +1,4 @@
-"""Linha de comando: kurt-app servir | validar | layout."""
+"""Linha de comando: kurt-app servir | validar | layout | cenario | dia."""
 
 from __future__ import annotations
 
@@ -33,7 +33,23 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--descricao", default="")
     c.add_argument("--horizonte")
 
+    d = sub.add_parser("dia", help="grava a pasta que o Kurt recebe para um dia de um cenário de simulação")
+    d.add_argument("simulacao")
+    d.add_argument("data", help="AAAA-MM-DD")
+    d.add_argument("saida")
+    d.add_argument("--cenario", type=int, default=0, help="0 = determinístico; 1.. = dias históricos sorteados")
+    d.add_argument("--cadastro", help="pasta do caso base (padrão: KURT_APP_CADASTRO)")
+
     a = p.parse_args(argv)
+
+    if a.cmd == "dia":
+        from .api import criar_app
+        from .dia import exportar_dia
+
+        app = criar_app(a.cadastro)
+        info = exportar_dia(app.state.simulacoes, a.simulacao, a.data, a.cenario, a.saida)
+        print(json.dumps({k: info[k] for k in ("data", "cenario", "deck", "estagio", "fcf", "avisos")}, indent=1))
+        return 0
 
     if a.cmd == "cenario":
         from pathlib import Path

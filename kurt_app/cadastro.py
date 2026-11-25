@@ -191,6 +191,22 @@ class Cadastro:
             "restricoes": restricoes,
         }
 
+    def renovaveis(self, data: str) -> list[dict[str, Any]]:
+        """Eólicas e solares vigentes na data, com a UF e o submercado da barra."""
+        with self._lock:
+            cur = self._q(
+                f"""
+                SELECT u.usina_id, u.nome, u.fonte_energia, coalesce(u.submercado, b.submercado) AS submercado,
+                       u.cap_mw, u.flag_corte, u.barra_id, b.uf
+                FROM usinas u LEFT JOIN barras b ON b.barra_id = u.barra_id AND {self._vig("b")}
+                WHERE {self._vig("u")} AND u.fonte_energia IN ('EOL', 'UFV')
+                ORDER BY u.usina_id
+                """,
+                [data, data, data, data],
+            )
+            cols = [c[0] for c in cur.description]
+            return [dict(zip(cols, r, strict=True)) for r in cur.fetchall()]
+
     def eventos(
         self,
         de: str | None = None,

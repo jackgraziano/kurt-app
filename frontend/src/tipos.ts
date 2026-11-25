@@ -216,3 +216,26 @@ export interface DocInsumo<T> {
   insumo: string;
   dados: T;
 }
+
+// abas que vêm do DECOMP
+export interface SemanaSeries {
+  semana: string;
+  dias: string[];
+  patamar: number[];
+  carga: Record<string, number[]>;
+  mmgd: Record<string, number[]>;
+  ande: number[];
+  renovaveis: Record<string, number[]>;
+  fator_renovaveis: Record<string, number | null>;
+}
+
+export type Linha = Record<string, string | number | boolean | null>;
+
+export interface DadosAba {
+  opcoes: Record<string, unknown>;
+  avisos?: string[];
+  semanas?: Linha[];
+  plano?: { data: string; peso: number; tipo: string | null; cenarios: number }[];
+  resumo?: { dias: number; rodadas: number };
+  [tabela: string]: unknown;
+}

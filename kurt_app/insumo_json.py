@@ -33,7 +33,7 @@ from collections.abc import Callable
 from datetime import date, datetime
 from typing import Any
 
-from . import decks
+from . import abas, decks
 from .cenario import BASE, CenarioErro
 from .simulacao import IDS_INSUMOS, SimulacaoErro, Simulacoes
 
@@ -143,7 +143,7 @@ def _importar_decks(sims: Simulacoes, s: dict, dados: dict) -> dict:
 ABAS: dict[str, tuple[Exportar, Importar]] = {
     "rede": (_exportar_rede, _importar_rede),
     "decks": (_exportar_decks, _importar_decks),
-}
+} | {aba: (abas.exportar(aba), abas.importar(aba)) for aba in abas.ABAS}
 
 
 def _par(aba: str) -> tuple[Exportar, Importar]:

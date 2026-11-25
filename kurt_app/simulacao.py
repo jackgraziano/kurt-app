@@ -59,36 +59,47 @@ INSUMOS: tuple[Insumo, ...] = (
         "e as restrições elétricas: RESP, LPP, RE e limites de intercâmbio.",
         True,
     ),
-    Insumo("carga", "Carga", "Demanda por submercado e por barra, mês a mês e na curva horária.", False),
+    Insumo(
+        "carga",
+        "Carga",
+        "Carga por submercado (DP do DECOMP), ANDE e MMGD, por semana e patamar, com forma semi-horária do "
+        "histórico do mês e do tipo de dia (útil, sábado, domingo/feriado).",
+        True,
+    ),
     Insumo(
         "renovaveis",
         "Renováveis",
-        "Geração eólica e solar prevista (séries e cenários), usinas não despacháveis (flag 0), MMGD e limites de corte.",
-        False,
+        "Eólicas e solares por usina: capacidade × fator de capacidade histórico, escaladas para somar os "
+        "equivalentes do DECOMP (renovaveis.csv), ou só pela capacidade.",
+        True,
     ),
     Insumo(
         "hidro",
         "Hidro",
-        "Afluências, níveis iniciais dos reservatórios, FPHA e restrições hidráulicas "
-        "(operuh, defluências mínimas, máximas e sazonais).",
-        False,
+        "Vazões incrementais semanais por posto (vazoes.rvN) e volumes iniciais (UH); FPHA e restrições "
+        "hidráulicas seguem o deck DESSEM do caso base.",
+        True,
     ),
     Insumo(
         "valor_agua",
         "Valor da água",
-        "Função de custo futuro (cortes do DECOMP) que valora o armazenamento no fim de cada dia: "
-        "de rodadas de planejamento do horizonte, do DECOMP oficial ou repetindo a do deck base. "
-        "Sem ela o Kurt não roda.",
-        False,
+        "Função de custo futuro (cortdeco e mapcut) de cada semana: a do deck DECOMP executado da aba Decks "
+        "ou um par de arquivos escolhido. Sem ela o Kurt não roda.",
+        True,
     ),
-    Insumo("termicas", "Térmicas", "Disponibilidade, inflexibilidade, CVU e manutenções das térmicas.", False),
+    Insumo(
+        "termicas",
+        "Térmicas",
+        "Inflexibilidade, disponibilidade e CVU por semana e patamar (CT do DECOMP) e o estado inicial das "
+        "unidades; manutenções são ignoradas.",
+        True,
+    ),
     Insumo(
         "execucao",
         "Execução",
-        "Como rodar: dias (todos ou típicos), discretização, quantos cenários combinar entre carga, "
-        "renováveis e afluência, saídas (P10, P50, P90 por mês, submercado, tipo de corte e usina) "
-        "e opções do PL (rede, UC). Daqui a rodada será disparada.",
-        False,
+        "Dias rodados (representativos ou todos), número de cenários sorteados de carga e renováveis, "
+        "discretização, paralelismo e rede. Daqui a rodada será disparada.",
+        True,
     ),
 )
 IDS_INSUMOS = tuple(i.id for i in INSUMOS)

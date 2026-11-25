@@ -128,8 +128,13 @@ function cartaoSimulacao(s: Simulacao): string {
   </a>`;
 }
 
-// um insumo está definido quando a aba já tem lógica e guardou alguma escolha
-const configurado = (s: Simulacao, i: Insumo) => i.disponivel && Object.keys(s.insumos[i.id] ?? {}).length > 0;
+// abas cujo nível vem dos decks DECOMP: ficam definidas assim que a aba Decks estiver
+const ABAS_DECOMP = ["carga", "renovaveis", "termicas", "hidro", "valor_agua", "execucao"];
+const temDecks = (s: Simulacao) => ((s.insumos.decks?.semanas as unknown[] | undefined) ?? []).length > 0;
+
+// um insumo está definido quando a aba já tem lógica e guardou alguma escolha (ou segue os decks)
+const configurado = (s: Simulacao, i: Insumo) =>
+  i.disponivel && (Object.keys(s.insumos[i.id] ?? {}).length > 0 || (ABAS_DECOMP.includes(i.id) && temDecks(s)));
 
 // ---------- tela do cenário ----------
 async function telaCenario(nome: string, aba: string): Promise<void> {
@@ -168,6 +173,11 @@ async function telaCenario(nome: string, aba: string): Promise<void> {
   if (aba === "rede") return abrirAbaRede(s);
   if (aba === ABA_RESUMO) return mostrarResumo(s);
   if (aba === "decks") return abrirDecks(conteudo, s, rotear);
+  if (ABAS_DECOMP.includes(aba)) {
+    const ins = insumos.find((i) => i.id === aba)!;
+    const { abrirAbaDecomp } = await import("./abas_decomp");
+    return abrirAbaDecomp(conteudo, s, aba, ins.rotulo, ins.descricao, rotear);
+  }
   const ins = insumos.find((i) => i.id === aba)!;
   conteudo.innerHTML = `<div class="pagina">
     <h2>${esc(ins.rotulo)}</h2>

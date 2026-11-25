@@ -93,6 +93,8 @@ Há um datalake do setor elétrico em `/mnt/nas`, na máquina Linux. Todo agente
   - `cap_mw` de EOL e UFV é o máximo da previsão do dia, porque o deck traz 9999;
   - barras de terminal de gerador (990 a 992 kV) foram agrupadas na subestação de alta.
 - **Caso `expansao`:** 817 eventos, sendo 589 de usinas do RALIE e 228 de obras do SIGET. Só cerca de 40% da potência do RALIE casou com o deck; o resto está nos CSVs de pendências. As datas de 2031 são em boa parte datas-limite de outorga, não previsões.
-- **Abas:** Decks e Rede elétrica têm lógica; as outras são esqueleto. O desenho das próximas (nível do DECOMP, forma do histórico) está no doc "kurt-app: projeção a partir de decks DECOMP".
+- **Abas:** todas têm lógica. Carga, Renováveis, Térmicas, Hidro, Valor da água e Execução tiram o nível dos decks da aba Decks (`niveis.py`) e a forma do histórico (`fontes/formas.py`, Parquet em `dados/formas/`, gerados por `scripts/formas_historico.py`; outro lugar via `KURT_APP_FORMAS`). Cada uma guarda só `opcoes` e `sobrescritos` (`abas.py`); a calibração está em `series.py`. O desenho está no doc "kurt-app: projeção a partir de decks DECOMP".
+- **Pasta do dia:** `kurt-app dia <cenário> <AAAA-MM-DD> <saida> [--cenario k]` (`dia.py`) grava tudo o que o Kurt recebe para um dia: séries de carga, MMGD, ANDE e renováveis por usina, térmicas, vazões, volumes, FCF e a rede vigente. É o contrato com o gerador de deck do Kurt.
+- **Myria:** `fontes/myria.py` só lê (GET). A chave fica num arquivo na máquina Linux (caminho em `KURT_APP_MYRIA_CHAVE`); nunca a imprima, copie nem grave.
 - **Fontes de decks** são configuradas por ambiente: `KURT_APP_DECKS` (pastas, separadas por `:`) e `KURT_APP_DECKS_ONS` (raiz dos decks oficiais, `.../ons/decomp/valor-esperado`).
-- **Ainda não existem:** o gerador de deck a partir de um cenário (no Kurt) e o disparo de rodadas.
+- **Ainda não existem:** o gerador de deck a partir da pasta do dia (no Kurt) e o disparo de rodadas.

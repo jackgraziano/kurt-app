@@ -21,6 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from . import __version__, decks
 from .cadastro import Cadastro, CadastroErro
 from .cenario import BASE, CenarioErro, Cenarios
+from .dia import resumo_semana
 from .esquema import ENTIDADES, TABELAS
 from .importar import eventos_de_linhas, eventos_de_usinas
 from .insumo_json import exportar as exportar_insumo
@@ -65,6 +66,7 @@ def criar_app(
     simulacoes = Simulacoes(sim_dir, cenarios)
     app = FastAPI(title="kurt-app", version=__version__)
     app.state.cenarios = cenarios
+    app.state.simulacoes = simulacoes
 
     def cad(nome: str | None) -> Cadastro:
         with _erros(f"cenário {nome} não existe", f"cenário {nome} não se aplica: "):
@@ -258,6 +260,12 @@ def criar_app(
     def subir_insumo(nome: str, aba: str, doc: dict[str, Any] = Body(...)):
         with _erros(f"cenário {nome} ou aba {aba} não existe"):
             return importar_insumo(simulacoes, nome, aba, doc)
+
+    @app.get("/api/simulacoes/{nome}/semana")
+    def semana_simulacao(nome: str, inicio: str, cenario: int = 0):
+        """Séries semi-horárias agregadas de uma semana (carga, MMGD, ANDE, renováveis), para os gráficos."""
+        with _erros(f"cenário {nome} não existe"):
+            return resumo_semana(simulacoes, nome, inicio, cenario)
 
     @app.delete("/api/simulacoes/{nome}", status_code=204)
     def apagar_simulacao(nome: str):

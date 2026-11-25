@@ -1,4 +1,4 @@
-import type { BarraBusca, CenarioDetalhe, CenarioResumo, Configuracao, Deck, Diferenca, DocInsumo, Evento, EventoCenario, Ficha, FonteDecks, Insumo, Meta, SemanaDeck, Simulacao, Validacao } from "./tipos";
+import type { BarraBusca, CenarioDetalhe, CenarioResumo, Configuracao, Deck, Diferenca, DocInsumo, Evento, EventoCenario, Ficha, FonteDecks, Insumo, Meta, SemanaDeck, SemanaSeries, Simulacao, Validacao } from "./tipos";
 
 type Params = Record<string, string | number | undefined>;
 
@@ -59,6 +59,8 @@ export const api = {
   // JSON de cada aba de insumo: baixar (link direto) e subir de volta
   urlInsumo: (nome: string, aba: string) => `/api/simulacoes/${encodeURIComponent(nome)}/insumos/${aba}?baixar=1`,
   insumo: <T>(nome: string, aba: string) => get<DocInsumo<T>>(`/api/simulacoes/${encodeURIComponent(nome)}/insumos/${aba}`),
+  semana: (nome: string, inicio: string, cenario = 0) =>
+    get<SemanaSeries>(`/api/simulacoes/${encodeURIComponent(nome)}/semana`, { inicio, cenario }),
   fontesDecks: () => get<FonteDecks[]>("/api/decks/fontes"),
   decks: (fonte: FonteDecks, inicio: string, fim: string) =>
     get<{ decks: Deck[]; semanas: SemanaDeck[] }>("/api/decks", { tipo: fonte.tipo, caminho: fonte.caminho, inicio, fim }),
