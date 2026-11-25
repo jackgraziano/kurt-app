@@ -322,7 +322,7 @@ def mapear_usinas(cadastro: Path, atr: pa.Table) -> tuple[pa.Table, dict]:
     cap_uf: dict[tuple[str, str, str], float] = defaultdict(float)
     for o in ons:
         cap_uf[(o["fonte"], o["submercado"], o["uf"])] += o["cap_mw"] or 0
-    for (f, s_, uf_), c in sorted(cap_uf.items(), key=lambda x: x[1]):
+    for (f, s_, uf_), _c in sorted(cap_uf.items(), key=lambda x: x[1]):
         uf_maior[(f, s_)] = uf_
     por_id = {u["usina_id"]: u for u in us}
     tem_grupo = {(o["fonte"], o["uf"]) for o in ons}
