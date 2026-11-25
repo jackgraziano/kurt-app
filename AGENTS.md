@@ -13,7 +13,8 @@ Plataforma local para projetar curtailment com o Kurt, um modelo físico em Rust
 | caso base | cadastro extraído do deck mais recente; imutável | Parquet em `dados/cadastro/<nome>/` |
 | caso de rede | camada de eventos datados sobre o caso base, com pai opcional | `kurt_app/cenario.py`, `dados/cenarios/` |
 | cenário (de simulação) | horizonte + um insumo por aba | `kurt_app/simulacao.py`, `dados/simulacoes/` |
-| aba / insumo | rede, carga, renovaveis, hidro, valor_agua, termicas, execucao | `INSUMOS` em `simulacao.py` |
+| aba / insumo | decks, rede, carga, renovaveis, hidro, valor_agua, termicas, execucao | `INSUMOS` em `simulacao.py` |
+| semana operativa | sábado a sexta; pertence ao mês da sexta-feira | `kurt_app/decks.py` |
 | evento | `entra`, `sai` ou `altera`, com data, fonte e confiança | `esquema.py` (tabela `eventos`) |
 
 Atenção: no código e na API os casos de rede ainda se chamam `cenarios` (`/api/cenarios`, `Cenarios`, `cenario.py`). Na interface, "cenário" é sempre o cenário de simulação. Não misture os dois em textos novos.
@@ -48,6 +49,7 @@ Escopo combinado de cada aba:
 
 | Aba | Escopo |
 | --- | --- |
+| Decks | decks DECOMP do cenário (pasta, como um estudo do Myria baixado, ou os oficiais do ONS) e o deck e estágio de cada semana operativa; mês sem deck repete o anterior. As outras abas tiram daqui os níveis |
 | Rede elétrica | topologia e usinas com expansão datada, mais as restrições elétricas (RESP, LPP, RE, limites de intercâmbio) |
 | Carga | demanda por submercado e por barra, mensal e na curva horária |
 | Renováveis | eólica e solar (séries e cenários), usinas não despacháveis (flag 0), MMGD e limites de corte |
@@ -91,5 +93,6 @@ Há um datalake do setor elétrico em `/mnt/nas`, na máquina Linux. Todo agente
   - `cap_mw` de EOL e UFV é o máximo da previsão do dia, porque o deck traz 9999;
   - barras de terminal de gerador (990 a 992 kV) foram agrupadas na subestação de alta.
 - **Caso `expansao`:** 817 eventos, sendo 589 de usinas do RALIE e 228 de obras do SIGET. Só cerca de 40% da potência do RALIE casou com o deck; o resto está nos CSVs de pendências. As datas de 2031 são em boa parte datas-limite de outorga, não previsões.
-- **Abas:** só a Rede elétrica tem lógica; as outras são esqueleto.
+- **Abas:** Decks e Rede elétrica têm lógica; as outras são esqueleto. O desenho das próximas (nível do DECOMP, forma do histórico) está no doc "kurt-app: projeção a partir de decks DECOMP".
+- **Fontes de decks** são configuradas por ambiente: `KURT_APP_DECKS` (pastas, separadas por `:`) e `KURT_APP_DECKS_ONS` (raiz dos decks oficiais, `.../ons/decomp/valor-esperado`).
 - **Ainda não existem:** o gerador de deck a partir de um cenário (no Kurt) e o disparo de rodadas.

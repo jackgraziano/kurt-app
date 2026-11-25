@@ -1,4 +1,4 @@
-import type { BarraBusca, CenarioDetalhe, CenarioResumo, Configuracao, Diferenca, Evento, EventoCenario, Ficha, Insumo, Meta, Simulacao, Validacao } from "./tipos";
+import type { BarraBusca, CenarioDetalhe, CenarioResumo, Configuracao, Deck, Diferenca, DocInsumo, Evento, EventoCenario, Ficha, FonteDecks, Insumo, Meta, SemanaDeck, Simulacao, Validacao } from "./tipos";
 
 type Params = Record<string, string | number | undefined>;
 
@@ -44,13 +44,24 @@ export const api = {
   insumos: () => get<Insumo[]>("/api/insumos"),
   simulacoes: () => get<Simulacao[]>("/api/simulacoes"),
   simulacao: (nome: string) => get<Simulacao>(`/api/simulacoes/${nome}`),
-  criarSimulacao: (dados: { nome: string; descricao?: string; inicio?: string; fim?: string; caso_rede?: string }) =>
+  criarSimulacao: (dados: {
+    nome: string;
+    descricao?: string;
+    inicio?: string;
+    fim?: string;
+    caso_rede?: string;
+    decks?: { fonte: FonteDecks };
+  }) =>
     pedir<Simulacao>("POST", "/api/simulacoes", {}, dados),
   atualizarSimulacao: (nome: string, mudancas: Partial<Pick<Simulacao, "descricao" | "inicio" | "fim" | "insumos">>) =>
     pedir<Simulacao>("PATCH", `/api/simulacoes/${nome}`, {}, mudancas),
   apagarSimulacao: (nome: string) => pedir<null>("DELETE", `/api/simulacoes/${nome}`),
   // JSON de cada aba de insumo: baixar (link direto) e subir de volta
   urlInsumo: (nome: string, aba: string) => `/api/simulacoes/${encodeURIComponent(nome)}/insumos/${aba}?baixar=1`,
+  insumo: <T>(nome: string, aba: string) => get<DocInsumo<T>>(`/api/simulacoes/${encodeURIComponent(nome)}/insumos/${aba}`),
+  fontesDecks: () => get<FonteDecks[]>("/api/decks/fontes"),
+  decks: (fonte: FonteDecks, inicio: string, fim: string) =>
+    get<{ decks: Deck[]; semanas: SemanaDeck[] }>("/api/decks", { tipo: fonte.tipo, caminho: fonte.caminho, inicio, fim }),
   subirInsumo: (nome: string, aba: string, doc: unknown) =>
     pedir<Simulacao>("POST", `/api/simulacoes/${encodeURIComponent(nome)}/insumos/${aba}`, {}, doc),
 

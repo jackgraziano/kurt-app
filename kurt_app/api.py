@@ -18,7 +18,7 @@ from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from . import __version__
+from . import __version__, decks
 from .cadastro import Cadastro, CadastroErro
 from .cenario import BASE, CenarioErro, Cenarios
 from .esquema import ENTIDADES, TABELAS
@@ -26,7 +26,7 @@ from .importar import eventos_de_linhas, eventos_de_usinas
 from .insumo_json import exportar as exportar_insumo
 from .insumo_json import importar as importar_insumo
 from .layout import CENTRO_UF, contornos_uf
-from .simulacao import INSUMOS, Simulacoes
+from .simulacao import INSUMOS, SimulacaoErro, Simulacoes
 from .validar import relatorio, validar
 
 RAIZ = Path(__file__).resolve().parent.parent
@@ -191,14 +191,50 @@ def criar_app(
 
     @app.post("/api/simulacoes", status_code=201)
     def criar_simulacao(dados: dict[str, Any] = Body(...)):
+        """Cria o cenário; com "decks": {"fonte": {...}}, já monta o mapa de decks (e não cria se falhar)."""
         with _erros(""):
-            return simulacoes.criar(
+            s = simulacoes.criar(
                 dados.get("nome", ""),
                 dados.get("descricao", ""),
                 dados.get("inicio"),
                 dados.get("fim"),
                 dados.get("caso_rede") or BASE,
             )
+            if dados.get("decks"):
+                try:
+                    s = simulacoes.atualizar(s["nome"], {"insumos": {"decks": decks.montar(s, dados["decks"])}})
+                except (SimulacaoErro, ValueError):
+                    simulacoes.apagar(s["nome"])
+                    raise
+            return s
+
+    # -- decks DECOMP -----------------------------------------------------------
+    def fontes_decks() -> list[dict]:
+        """Fontes configuradas na máquina: KURT_APP_DECKS (pastas, separadas por ':') e KURT_APP_DECKS_ONS."""
+        out = [
+            {"tipo": "pasta", "caminho": p, "rotulo": Path(p).name}
+            for p in os.environ.get("KURT_APP_DECKS", "").split(os.pathsep)
+            if p and Path(p).is_dir()
+        ]
+        ons = os.environ.get("KURT_APP_DECKS_ONS")
+        if ons and Path(ons).is_dir():
+            out.append({"tipo": "ons", "caminho": ons, "rotulo": "ONS oficial (NAS)"})
+        return out
+
+    @app.get("/api/decks/fontes")
+    def listar_fontes_decks():
+        return fontes_decks()
+
+    @app.get("/api/decks")
+    def listar_decks(tipo: str, caminho: str, inicio: str, fim: str):
+        """Decks DECOMP de uma fonte e o mapa semana -> deck que o app faria para o horizonte."""
+        with _erros(f"fonte {caminho} não existe"):
+            ini, f = date.fromisoformat(inicio), date.fromisoformat(fim)
+            lista = decks.catalogo({"tipo": tipo, "caminho": caminho}, ini, f)
+            return {
+                "decks": [d.dict() for d in lista],
+                "semanas": decks.mapear(decks.semanas_operativas(ini, f), lista),
+            }
 
     @app.get("/api/simulacoes/{nome}")
     def ler_simulacao(nome: str):

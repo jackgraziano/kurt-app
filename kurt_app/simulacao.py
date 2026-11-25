@@ -1,12 +1,13 @@
 """Cenários de simulação: o que uma rodada do Kurt vai usar, aba por aba.
 
 Um cenário de simulação tem um horizonte (início e fim) e um conjunto de
-insumos, um por aba do app: rede elétrica, carga, renováveis, hidro, valor da
-água, térmicas e execução.
-Cada insumo guarda só a escolha feita para ele. Por enquanto, só a rede é
-configurável, apontando para um caso de rede (o caso base ou uma camada de
-eventos sobre ele, ver ``cenario.py``). Os outros insumos são esqueletos, e
-ficam "a definir" até cada aba ganhar sua lógica.
+insumos, um por aba do app: decks, rede elétrica, carga, renováveis, hidro,
+valor da água, térmicas e execução.
+Cada insumo guarda só a escolha feita para ele. A rede aponta para um caso de
+rede (o caso base ou uma camada de eventos sobre ele, ver ``cenario.py``); os
+decks, para uma fonte de decks DECOMP e o mapa semana -> deck (``decks.py``).
+Os outros insumos são esqueletos e ficam "a definir" até cada aba ganhar sua
+lógica.
 
 Cada cenário é um JSON na pasta de simulações:
 
@@ -44,6 +45,13 @@ class Insumo:
 
 
 INSUMOS: tuple[Insumo, ...] = (
+    Insumo(
+        "decks",
+        "Decks",
+        "Decks DECOMP que dão o nível de cada semana do horizonte (carga, térmicas, renováveis, vazões, FCF): "
+        "de uma pasta (ex.: estudo do Myria baixado) ou os oficiais do ONS. Mês sem deck repete o anterior.",
+        True,
+    ),
     Insumo(
         "rede",
         "Rede elétrica",

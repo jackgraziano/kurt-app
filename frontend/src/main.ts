@@ -1,11 +1,13 @@
 import "./estilo.css";
 import { api } from "./api";
-import type { CenarioResumo, Insumo, Meta, Simulacao } from "./tipos";
+import { abrirDecks, fonteEscolhida, ligarOutraPasta, opcoesFontes } from "./decks";
+import type { CenarioResumo, FonteDecks, Insumo, Meta, Simulacao } from "./tipos";
 import { $, aviso, esc, fimDoMes, fmtData, listaMeses, rotuloMes } from "./util";
 
 // Casca do app: tela principal (lista e criação de cenários) e a tela de um
-// cenário, com uma aba por insumo da simulação. A aba "Rede elétrica" é o mapa
-// (rede.ts); as outras ainda são esqueleto.
+// cenário, com uma aba por insumo da simulação. A aba "Decks" escolhe os decks
+// DECOMP (decks.ts) e a "Rede elétrica" é o mapa (rede.ts); as outras ainda são
+// esqueleto.
 //
 // Rotas (hash): #/  ·  #/c/<cenário>  ·  #/c/<cenário>/<aba>
 
@@ -33,6 +35,7 @@ const meses = (s: Simulacao) => listaMeses(s.inicio, s.fim).length;
 const horizonte = (s: Simulacao) =>
   `${rotuloMes(s.inicio.slice(0, 7))} a ${rotuloMes(s.fim.slice(0, 7))} · ${meses(s)} ${meses(s) === 1 ? "mês" : "meses"}`;
 const casoRede = (s: Simulacao) => s.insumos.rede?.caso ?? "base";
+const fonteDecks = (s: Simulacao) => (s.insumos.decks?.fonte as FonteDecks | undefined)?.caminho ?? "";
 
 function mesSeguinte(iso: string, n = 1): string {
   const [a, m] = iso.split("-").map(Number);
@@ -45,7 +48,7 @@ async function telaInicio(): Promise<void> {
   mostrarTela("inicio");
   $("#trilha").innerHTML = `<span class="atual">Cenários</span>`;
   const el = $("#tela-inicio");
-  const [sims, casos] = await Promise.all([api.simulacoes(), api.cenarios()]);
+  const [sims, casos, fontes] = await Promise.all([api.simulacoes(), api.cenarios(), api.fontesDecks()]);
   const base = meta.data_base ?? new Date().toISOString().slice(0, 10);
   const ini = mesSeguinte(base);
   const fim = mesSeguinte(ini, 11);
@@ -64,6 +67,8 @@ async function telaInicio(): Promise<void> {
             <label>Fim <input name="fim" type="month" required value="${fim}" /></label>
           </div>
           <label>Caso de rede <select name="caso_rede">${opcoesCasos(casos, "base")}</select></label>
+          <label>Decks DECOMP <select name="fonte">${opcoesFontes(fontes, fontes[0] ?? null, true)}</select></label>
+          <label id="f-pasta">Pasta dos decks <input name="pasta" placeholder="/caminho/dos/decks" /></label>
           <p class="sub" id="f-horizonte"></p>
           <button class="primario">criar cenário</button>
         </form>
@@ -84,9 +89,11 @@ async function telaInicio(): Promise<void> {
   };
   f.addEventListener("input", resumoHorizonte);
   resumoHorizonte();
+  ligarOutraPasta(f.querySelector<HTMLSelectElement>("select[name=fonte]")!, $("#f-pasta"));
   f.addEventListener("submit", async (ev) => {
     ev.preventDefault();
     const fd = new FormData(f);
+    const fonte: FonteDecks | null = fonteEscolhida(fontes, String(fd.get("fonte")), String(fd.get("pasta") ?? ""));
     try {
       const s = await api.criarSimulacao({
         nome: String(fd.get("nome")),
@@ -94,6 +101,7 @@ async function telaInicio(): Promise<void> {
         inicio: `${fd.get("inicio")}-01`,
         fim: fimDoMes(String(fd.get("fim"))),
         caso_rede: String(fd.get("caso_rede")),
+        ...(fonte ? { decks: { fonte } } : {}),
       });
       location.hash = `#/c/${s.nome}`;
     } catch (err) {
@@ -159,6 +167,7 @@ async function telaCenario(nome: string, aba: string): Promise<void> {
   telaRede.hidden = aba !== "rede";
   if (aba === "rede") return abrirAbaRede(s);
   if (aba === ABA_RESUMO) return mostrarResumo(s);
+  if (aba === "decks") return abrirDecks(conteudo, s, rotear);
   const ins = insumos.find((i) => i.id === aba)!;
   conteudo.innerHTML = `<div class="pagina">
     <h2>${esc(ins.rotulo)}</h2>
@@ -224,7 +233,12 @@ async function mostrarResumo(s: Simulacao): Promise<void> {
   const linhas = insumos
     .map((i) => {
       const estado = !i.disponivel ? "a fazer" : configurado(s, i) ? "definido" : "a definir";
-      const detalhe = i.id === "rede" ? `caso de rede <b>${esc(casoRede(s))}</b>` : esc(i.descricao);
+      const detalhe =
+        i.id === "rede"
+          ? `caso de rede <b>${esc(casoRede(s))}</b>`
+          : i.id === "decks" && fonteDecks(s)
+            ? `fonte <b>${esc(fonteDecks(s))}</b>`
+            : esc(i.descricao);
       return `<tr><th><a href="#/c/${esc(s.nome)}/${i.id}">${esc(i.rotulo)}</a></th><td>${detalhe}</td><td><span class="estado ${estado.replace(" ", "-")}">${estado}</span></td></tr>`;
     })
     .join("");

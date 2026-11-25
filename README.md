@@ -99,6 +99,8 @@ Todas as consultas de rede aceitam `?cenario=<caso de rede>` (padrão `base`).
 | `GET/POST /api/simulacoes`, `GET/PATCH/DELETE /api/simulacoes/{nome}` | cenários de simulação |
 | `GET /api/simulacoes/{nome}/insumos/{aba}[?baixar=1]` | JSON da aba |
 | `POST /api/simulacoes/{nome}/insumos/{aba}` | sobe o JSON da aba |
+| `GET /api/decks/fontes` | fontes de decks DECOMP configuradas |
+| `GET /api/decks?tipo&caminho&inicio&fim` | decks de uma fonte e o mapa semana → deck |
 | `GET /api/ufs`, `GET /api/esquema` | contorno das UFs e esquema das tabelas |
 
 ## Como rodar
@@ -128,6 +130,8 @@ Dados locais, fora do git (`dados/`):
 | `dados/cadastro/<nome>/` | casos base extraídos | `KURT_APP_CADASTRO` |
 | `dados/cenarios/<cadastro>/` | casos de rede, um JSON por caso | `KURT_APP_CENARIOS` |
 | `dados/simulacoes/<cadastro>/` | cenários de simulação, um JSON por cenário | `KURT_APP_SIMULACOES` |
+| pastas de decks DECOMP (uma subpasta ou .zip por deck) | fontes da aba Decks | `KURT_APP_DECKS` (separadas por `:`) |
+| decks oficiais do ONS (`<ano>/<AAAAMMDD>__DEC_ONS_..._VE.zip`) | fonte da aba Decks, para backtest | `KURT_APP_DECKS_ONS` |
 
 ## Fixture
 

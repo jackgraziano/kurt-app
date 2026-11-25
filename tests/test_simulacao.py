@@ -22,7 +22,7 @@ def test_horizonte_padrao():
 def test_insumos(cli):
     ins = cli.get("/api/insumos").json()
     assert [i["id"] for i in ins] == list(IDS_INSUMOS)
-    assert [i["id"] for i in ins if i["disponivel"]] == ["rede"]
+    assert [i["id"] for i in ins if i["disponivel"]] == ["decks", "rede"]
 
 
 def test_ciclo_de_vida(cli):

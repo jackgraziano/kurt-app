@@ -30,9 +30,10 @@ e o cenário passa a usá-lo. Casos de rede compartilhados nunca são alterados.
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
+from . import decks
 from .cenario import BASE, CenarioErro
 from .simulacao import IDS_INSUMOS, SimulacaoErro, Simulacoes
 
@@ -118,7 +119,31 @@ def _importar_rede(sims: Simulacoes, s: dict, dados: dict) -> dict:
     return sims.atualizar(nome, {"insumos": {"rede": {"caso": nome_caso_proprio(nome)}}})
 
 
-ABAS: dict[str, tuple[Exportar, Importar]] = {"rede": (_exportar_rede, _importar_rede)}
+# -- decks --------------------------------------------------------------------
+def _exportar_decks(_sims: Simulacoes, s: dict) -> tuple[dict, list[str]]:
+    insumo = dict(s.get("insumos", {}).get("decks") or {})
+    insumo.setdefault("fonte", None)
+    insumo.setdefault("so_rv0", True)
+    insumo.setdefault("semanas", [])
+    if insumo["fonte"]:
+        try:
+            ini, fim = date.fromisoformat(s["inicio"]), date.fromisoformat(s["fim"])
+            insumo["decks_disponiveis"] = [d.dict() for d in decks.catalogo(insumo["fonte"], ini, fim)]
+        except SimulacaoErro as e:
+            insumo["decks_disponiveis"] = []
+            insumo["erro_fonte"] = str(e)
+    insumo["avisos"] = decks.avisos(insumo, s)
+    return insumo, decks.AJUDA_DECKS
+
+
+def _importar_decks(sims: Simulacoes, s: dict, dados: dict) -> dict:
+    return sims.atualizar(s["nome"], {"insumos": {"decks": decks.montar(s, dados)}})
+
+
+ABAS: dict[str, tuple[Exportar, Importar]] = {
+    "rede": (_exportar_rede, _importar_rede),
+    "decks": (_exportar_decks, _importar_decks),
+}
 
 
 def _par(aba: str) -> tuple[Exportar, Importar]:

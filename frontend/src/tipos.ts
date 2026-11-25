@@ -174,3 +174,45 @@ export interface Simulacao {
   atualizado_em: string;
   insumos: Record<string, Record<string, unknown>> & { rede?: { caso?: string } };
 }
+
+// aba Decks
+export interface FonteDecks {
+  tipo: "pasta" | "ons";
+  caminho: string;
+  rotulo?: string;
+}
+
+export interface Deck {
+  id: string;
+  fonte: string;
+  caminho: string;
+  inicio: string;
+  mes: string;
+  revisao: number;
+}
+
+export interface SemanaDeck {
+  inicio: string;
+  fim: string;
+  mes: string;
+  semana: number;
+  deck: string | null;
+  estagio: number | null;
+  repetido: boolean;
+}
+
+export interface InsumoDecks {
+  fonte: FonteDecks | null;
+  so_rv0: boolean;
+  semanas: SemanaDeck[];
+  decks_disponiveis?: Deck[];
+  erro_fonte?: string;
+  avisos?: string[];
+}
+
+export interface DocInsumo<T> {
+  formato: string;
+  versao: number;
+  insumo: string;
+  dados: T;
+}
