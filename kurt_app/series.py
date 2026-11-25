@@ -32,6 +32,9 @@ from .fontes.formas import SUBMERCADOS, Formas, tipo_dia
 MEIAS = 48
 PATAMARES = (1, 2, 3)
 RAZAO_MAX = 3.0
+# faixa do fator que leva a soma das usinas ao equivalente do DECOMP; fora dela, o
+# equivalente provavelmente não cobre aquelas usinas (ex.: solares do S e do N)
+FAIXA_FATOR = (0.5, 2.0)
 
 
 def dias_da_semana(inicio: str) -> list[date]:
@@ -189,19 +192,21 @@ def semana(
         )
         out_ren[u["usina_id"]] = np.minimum(fc * (u["cap_mw"] or 0.0), u["cap_mw"] or 0.0)
         grupos.setdefault((u["submercado"], u["fonte_energia"]), []).append(u["usina_id"])
-    fatores = {}
+    fatores: dict[str, float] = {}
+    fora: dict[str, float] = {}
     if nivel == "decomp":
         for (s, fonte), ids in grupos.items():
             alvo = _por_patamar(renovaveis, {"submercado": s, "fonte": fonte})
-            if not alvo:
-                continue
             soma = sum(out_ren[i] for i in ids)
-            alvo_ajustado = ajustar_total(soma, pat, alvo)
-            with np.errstate(divide="ignore", invalid="ignore"):
-                k = np.where(soma > 1e-9, alvo_ajustado / soma, 0.0)
+            if not alvo or float(soma.sum()) <= 1e-9:
+                continue
+            bruto = float(ajustar_total(soma, pat, alvo).sum() / soma.sum())
+            k = min(max(bruto, FAIXA_FATOR[0]), FAIXA_FATOR[1])
+            if k != bruto:
+                fora[f"{s}|{fonte}"] = round(bruto, 3)
             for i in ids:
                 out_ren[i] = out_ren[i] * k
-            fatores[f"{s}|{fonte}"] = float(alvo_ajustado.sum() / soma.sum()) if soma.sum() else None
+            fatores[f"{s}|{fonte}"] = k
     return {
         "dias": [d.isoformat() for d in dias],
         "patamar": pat,
@@ -210,6 +215,7 @@ def semana(
         "ande": out_ande,
         "renovaveis": out_ren,
         "fator_renovaveis": fatores,
+        "fator_fora_da_faixa": fora,
     }
 
 

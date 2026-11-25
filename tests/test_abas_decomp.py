@@ -145,10 +145,13 @@ def test_subida_invalida_nao_grava(cli):
     assert cli.get("/api/simulacoes/s1").json() == antes
 
 
-def test_series_batem_com_o_decomp(cli):
+def test_series_batem_com_o_decomp(cli, monkeypatch):
     sims = cli.app.state.simulacoes
     s = sims.ler("s1")
     x = niveis.semanas(s)[0]
+    # na fixture o fator do NE EOL é 0,32: fora da faixa, fica limitado a 0,5 e avisado
+    assert dia.semana(sims, s, x)["fator_renovaveis"]["NE|EOL"] == 0.5
+    monkeypatch.setattr(series, "FAIXA_FATOR", (0.0, 1e9))
     sem = dia.semana(sims, s, x)
     pat = sem["patamar"]
     horas = x["horas"]
@@ -191,7 +194,8 @@ def test_exportar_dia(cli, tmp_path):
     assert len(info["patamar"]) == 48 and info["deck"] == "DC122026"
     assert info["avisos"]  # o deck mínimo não tem FCF
     carga = pq.read_table(tmp_path / "dia" / "carga.parquet")
-    assert carga.num_rows == 48 * 5
+    assert carga.num_rows == 48 * 5 * 3  # quarta a sexta
+    assert len(info["dias"]) == 3
     assert json.loads((tmp_path / "dia" / "dia.json").read_text())["data"] == "2026-12-02"
 
 

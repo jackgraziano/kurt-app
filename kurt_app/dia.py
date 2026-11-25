@@ -1,12 +1,14 @@
 """O que o Kurt recebe para rodar um dia de um cenário: uma pasta com tudo resolvido.
 
 ``exportar_dia`` junta as escolhas de todas as abas para uma data e um cenário de
-sorteio (0 = determinístico) e grava:
+sorteio (0 = determinístico) e grava, do dia pedido até a sexta-feira da semana
+operativa (a FCF do DECOMP vale no fim da semana; o gerador de deck usa o primeiro
+dia em meias horas e os outros como o molde DESSEM pede):
 
-- ``dia.json``: data, cenário, semana, deck, estágio, patamar de cada meia hora,
+- ``dia.json``: data, cenário, semana, deck, estágio, patamar de cada meia hora de cada dia,
   FCF (caminhos de cortdeco e mapcut e o estágio), opções e avisos;
-- ``carga.parquet``: meia_hora, submercado, carga_mw, mmgd_mw, e a ANDE (submercado "ANDE");
-- ``renovaveis.parquet``: usina_id, meia_hora, mw, cap_mw e cap_origem (eólicas e solares do
+- ``carga.parquet``: data, meia_hora, submercado, carga_mw, mmgd_mw, e a ANDE (submercado "ANDE");
+- ``renovaveis.parquet``: data, usina_id, meia_hora, mw, cap_mw e cap_origem (eólicas e solares do
   caso de rede; com a opção 'ons' da aba Renováveis, cap_mw é a capacidade instalada do ONS);
 - ``termicas.parquet``: linhas do CT da semana (com sobrescritos), por patamar;
 - ``vazoes.parquet`` (posto, m3s) e ``volumes.parquet`` (usina, ree, vol_ini_pct);
@@ -95,39 +97,48 @@ def exportar_dia(sims: Simulacoes, nome: str, data: str, cenario: int, saida: st
     sems = niveis.semanas(s)
     x = niveis.semana_do_dia(sems, d)
     sem = semana(sims, s, x, cenario)
-    i = sem["dias"].index(data)
-    fatia = slice(i * series.MEIAS, (i + 1) * series.MEIAS)
+    i0 = sem["dias"].index(data)
     saida = Path(saida)
     saida.mkdir(parents=True, exist_ok=True)
     mh = list(range(series.MEIAS))
+    # do dia pedido até a sexta da semana operativa (a FCF vale no fim da semana)
+    dias = list(range(i0, 7))
+
+    def fatia(i: int) -> slice:
+        return slice(i * series.MEIAS, (i + 1) * series.MEIAS)
 
     linhas = []
-    for sub, v in sem["carga"].items():
-        m = sem["mmgd"].get(sub, np.zeros_like(v))
+    for i in dias:
+        dt = sem["dias"][i]
+        for sub, v in sem["carga"].items():
+            m = sem["mmgd"].get(sub, np.zeros_like(v))
+            linhas += [
+                {"data": dt, "meia_hora": h, "submercado": sub, "carga_mw": float(c), "mmgd_mw": float(g)}
+                for h, c, g in zip(mh, v[fatia(i)], m[fatia(i)], strict=True)
+            ]
         linhas += [
-            {"meia_hora": h, "submercado": sub, "carga_mw": float(c), "mmgd_mw": float(g)}
-            for h, c, g in zip(mh, v[fatia], m[fatia], strict=True)
+            {"data": dt, "meia_hora": h, "submercado": "ANDE", "carga_mw": float(c), "mmgd_mw": 0.0}
+            for h, c in zip(mh, sem["ande"][fatia(i)], strict=True)
         ]
-    linhas += [
-        {"meia_hora": h, "submercado": "ANDE", "carga_mw": float(c), "mmgd_mw": 0.0}
-        for h, c in zip(mh, sem["ande"][fatia], strict=True)
-    ]
     _gravar(pa.Table.from_pylist(linhas), saida / "carga.parquet")
     _gravar(
         pa.Table.from_pylist(
             [
                 {
+                    "data": sem["dias"][i],
                     "usina_id": u,
                     "meia_hora": h,
                     "mw": float(v),
                     "cap_mw": float(sem["usinas"][u]["cap_mw"] or 0.0),
                     "cap_origem": sem["usinas"][u]["cap_origem"],
                 }
+                for i in dias
                 for u, serie in sem["renovaveis"].items()
-                for h, v in zip(mh, serie[fatia], strict=True)
+                for h, v in zip(mh, serie[fatia(i)], strict=True)
             ],
             schema=pa.schema(
                 [
+                    ("data", pa.string()),
                     ("usina_id", pa.string()),
                     ("meia_hora", pa.int32()),
                     ("mw", pa.float64()),
@@ -152,6 +163,10 @@ def exportar_dia(sims: Simulacoes, nome: str, data: str, cenario: int, saida: st
 
     fcf = next(f for f in abas.fcf_semanas(s) if f["semana"] == x["inicio"])
     avisos = [] if fcf["cortdeco"] else ["sem FCF nesta semana: o Kurt não roda sem ela (aba Valor da água)"]
+    avisos += [
+        f"renováveis {k}: fator {v} para bater com o DECOMP, limitado a {series.FAIXA_FATOR}"
+        for k, v in sem["fator_fora_da_faixa"].items()
+    ]
     info = {
         "cenario_simulacao": nome,
         "data": data,
@@ -160,10 +175,12 @@ def exportar_dia(sims: Simulacoes, nome: str, data: str, cenario: int, saida: st
         "deck": x["deck"],
         "estagio": x["estagio_usado"],
         "repetido": x["repetido"],
-        "patamar": sem["patamar"][fatia].astype(int).tolist(),
+        "patamar": sem["patamar"][fatia(i0)].astype(int).tolist(),
+        "dias": [{"data": sem["dias"][i], "patamar": sem["patamar"][fatia(i)].astype(int).tolist()} for i in dias],
         "fcf": fcf,
         "caso_rede": caso,
         "fator_renovaveis": sem["fator_renovaveis"],
+        "fator_fora_da_faixa": sem["fator_fora_da_faixa"],
         "opcoes": {a: abas._opcoes(s, a) for a in abas.ABAS},
         "avisos": avisos,
     }
@@ -195,4 +212,5 @@ def resumo_semana(sims: Simulacoes, nome: str, inicio: str, cenario: int = 0) ->
         "ande": r(sem["ande"]),
         "renovaveis": {k: r(v) for k, v in sorted(ren.items())},
         "fator_renovaveis": sem["fator_renovaveis"],
+        "fator_fora_da_faixa": sem["fator_fora_da_faixa"],
     }

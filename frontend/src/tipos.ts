@@ -227,6 +227,7 @@ export interface SemanaSeries {
   ande: number[];
   renovaveis: Record<string, number[]>;
   fator_renovaveis: Record<string, number | null>;
+  fator_fora_da_faixa: Record<string, number>;
 }
 
 export type Linha = Record<string, string | number | boolean | null>;

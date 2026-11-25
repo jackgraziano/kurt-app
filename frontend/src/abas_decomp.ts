@@ -281,7 +281,13 @@ async function painelSemana(el: HTMLElement, s: Simulacao, aba: string, semanas:
         aba === "renovaveis"
           ? `Soma das usinas do caso de rede, em MW. Fator aplicado para bater com o DECOMP: ${Object.entries(sem.fator_renovaveis)
               .map(([k, v]) => `${k} ${v === null ? "–" : v.toFixed(2)}`)
-              .join(" · ")}`
+              .join(" · ")}${
+              Object.keys(sem.fator_fora_da_faixa).length
+                ? `. Fora da faixa 0,5 a 2 (limitado; o equivalente do DECOMP talvez não cubra essas usinas): ${Object.entries(sem.fator_fora_da_faixa)
+                    .map(([k, v]) => `${k} ${v.toFixed(2)}`)
+                    .join(" · ")}`
+                : ""
+            }`
           : "MW por submercado. A média de cada patamar na semana bate com o DECOMP.";
     } catch (err) {
       el.querySelector("#g-nota")!.textContent = String(err);
