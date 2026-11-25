@@ -93,10 +93,38 @@ const CAMPOS: Record<string, Campo[]> = {
     },
     { nome: "paralelo", rotulo: "Rodadas em paralelo", tipo: "inteiro", min: 1, max: 64 },
     { nome: "rede", rotulo: "com a rede elétrica", tipo: "sim" },
+    {
+      nome: "operuh",
+      rotulo: "Restrições hidráulicas do molde (operuh)",
+      tipo: "escolha",
+      opcoes: [
+        ["so_defluencia", "só as de defluência"],
+        ["manter", "todas"],
+        ["retirar", "nenhuma"],
+      ],
+    },
+    {
+      nome: "ptoper",
+      rotulo: "Pontos de operação das térmicas do molde (ptoper)",
+      tipo: "escolha",
+      opcoes: [
+        ["retirar", "retirar"],
+        ["manter", "manter"],
+      ],
+    },
+    {
+      nome: "r11",
+      rotulo: "Régua 11 de Itaipu do molde",
+      tipo: "escolha",
+      opcoes: [
+        ["retirar", "retirar"],
+        ["manter", "manter"],
+      ],
+    },
   ],
 };
 
-const MINUTOS_POR_RODADA = 5; // um dia do SIN leva de 4 a 7 minutos
+const MINUTOS_POR_RODADA = 7; // um dia do SIN leva cerca de 6 minutos (sábados, com 7 dias de horizonte, mais)
 
 function campoHtml(c: Campo, v: unknown): string {
   if (c.tipo === "escolha")

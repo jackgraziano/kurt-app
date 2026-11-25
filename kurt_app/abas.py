@@ -151,6 +151,10 @@ def _op_execucao(op: dict, s: dict) -> dict:
         "discretizacao": _escolha(op, "discretizacao", ("semi-horaria", "horaria"), "semi-horaria"),
         "paralelo": _inteiro(op, "paralelo", 1, 64, 4),
         "rede": bool(op.get("rede", True)),
+        # o que o gerador do deck do dia faz com o que é só do dia do molde DESSEM
+        "ptoper": _escolha(op, "ptoper", ("retirar", "manter"), "retirar"),
+        "r11": _escolha(op, "r11", ("retirar", "manter"), "retirar"),
+        "operuh": _escolha(op, "operuh", ("so_defluencia", "manter", "retirar"), "so_defluencia"),
     }
 
 
@@ -285,6 +289,9 @@ ABAS: dict[str, Aba] = {
             " com peso igual ao número de dias daquele tipo; 'todos' roda todos os dias.",
             "opcoes.cenarios: quantos cenários de carga e renováveis sortear (dias históricos); semente fixa o sorteio.",
             "opcoes.discretizacao, paralelo (rodadas ao mesmo tempo) e rede (com ou sem a rede elétrica).",
+            "O deck de cada dia usa como molde o deck DESSEM do ONS mais recente com o mesmo dia da semana."
+            " opcoes.ptoper e r11 (retirar | manter): pontos de operação das térmicas e régua 11 de Itaipu do dia"
+            " do molde; opcoes.operuh: so_defluencia (mantém só as restrições de defluência), manter ou retirar.",
             "'plano' é só informativo: os dias que serão rodados e o peso de cada um.",
         ),
     ),

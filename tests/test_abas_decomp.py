@@ -193,6 +193,7 @@ def test_exportar_dia(cli, tmp_path):
     assert {"dia.json", "carga.parquet", "renovaveis.parquet", "termicas.parquet", "barras.parquet"} <= arqs
     assert len(info["patamar"]) == 48 and info["deck"] == "DC122026"
     assert info["avisos"]  # o deck mínimo não tem FCF
+    assert json.loads((tmp_path / "dia" / "opcoes_deck.json").read_text())["operuh"] == "so_defluencia"
     carga = pq.read_table(tmp_path / "dia" / "carga.parquet")
     assert carga.num_rows == 48 * 5 * 3  # quarta a sexta
     assert len(info["dias"]) == 3

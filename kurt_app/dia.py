@@ -12,7 +12,8 @@ dia em meias horas e os outros como o molde DESSEM pede):
   caso de rede; com a opção 'ons' da aba Renováveis, cap_mw é a capacidade instalada do ONS);
 - ``termicas.parquet``: linhas do CT da semana (com sobrescritos), por patamar;
 - ``vazoes.parquet`` (posto, m3s) e ``volumes.parquet`` (usina, ree, vol_ini_pct);
-- ``barras``, ``ramos``, ``usinas`` e ``restricoes.parquet``: a rede vigente na data.
+- ``barras``, ``ramos``, ``usinas`` e ``restricoes.parquet``: a rede vigente na data;
+- ``opcoes_deck.json``: o que o gerador faz com o que é só do dia do molde (ptoper, r11, operuh).
 
 O gerador de deck do Kurt lê essa pasta e escreve o deck DESSEM do dia.
 """
@@ -83,6 +84,12 @@ def capacidades(f, usinas: list[dict], escolha: str) -> list[dict]:
                 u["cap_mw"], u["cap_origem"] = float(r[0]), r[1]
         out.append(u)
     return out
+
+
+def _gravar_json(arq: Path, dados: dict) -> None:
+    tmp = arq.with_suffix(".tmp")
+    tmp.write_text(json.dumps(dados, ensure_ascii=False, indent=1))
+    tmp.replace(arq)
 
 
 def _gravar(tabela: pa.Table, arq: Path) -> None:
@@ -184,6 +191,8 @@ def exportar_dia(sims: Simulacoes, nome: str, data: str, cenario: int, saida: st
         "opcoes": {a: abas._opcoes(s, a) for a in abas.ABAS},
         "avisos": avisos,
     }
+    op_exec = abas._opcoes(s, "execucao")
+    _gravar_json(saida / "opcoes_deck.json", {k: op_exec[k] for k in ("ptoper", "r11", "operuh")})
     tmp = saida / "dia.json.tmp"
     tmp.write_text(json.dumps(info, ensure_ascii=False, indent=1))
     tmp.replace(saida / "dia.json")
