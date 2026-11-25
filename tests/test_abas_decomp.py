@@ -210,3 +210,14 @@ def test_plano_de_execucao(cli):
 def test_patamares():
     pat = series.patamares(np.arange(10.0), [2, 3, 5])
     assert pat.tolist() == [3, 3, 3, 3, 3, 2, 2, 2, 1, 1]
+
+
+def test_capacidade_do_ons(cli, monkeypatch):
+    sims = cli.app.state.simulacoes
+    s = sims.ler("s1")
+    x = niveis.semanas(s)[0]
+    f = niveis.formas()
+    monkeypatch.setattr(f, "capacidade", lambda uid: (1000.0, "ons") if uid == "U5441-1" else None, raising=False)
+    sem = dia.semana(sims, s, x)
+    assert sem["usinas"]["U5441-1"]["cap_mw"] == 1000.0 and sem["usinas"]["U5441-1"]["cap_origem"] == "ons"
+    assert sem["usinas"]["U5441-2"]["cap_origem"] == "caso"

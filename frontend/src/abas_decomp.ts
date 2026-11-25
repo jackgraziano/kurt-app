@@ -25,6 +25,15 @@ const CAMPOS: Record<string, Campo[]> = {
         ["capacidade", "capacidade × fator de capacidade histórico"],
       ],
     },
+    {
+      nome: "capacidade",
+      rotulo: "Capacidade das usinas",
+      tipo: "escolha",
+      opcoes: [
+        ["ons", "instalada do ONS (ou estimada de vários dias)"],
+        ["caso", "cap_mw do caso de rede"],
+      ],
+    },
   ],
   termicas: [
     {

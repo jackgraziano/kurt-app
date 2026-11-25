@@ -113,7 +113,10 @@ def _op_carga(op: dict, _s: dict) -> dict:
 
 
 def _op_renovaveis(op: dict, _s: dict) -> dict:
-    return {"nivel": _escolha(op, "nivel", ("decomp", "capacidade"), "decomp")}
+    return {
+        "nivel": _escolha(op, "nivel", ("decomp", "capacidade"), "decomp"),
+        "capacidade": _escolha(op, "capacidade", ("ons", "caso"), "ons"),
+    }
 
 
 def _op_termicas(op: dict, _s: dict) -> dict:
@@ -228,6 +231,8 @@ ABAS: dict[str, Aba] = {
             f"equivalentes: geração eólica e solar do DECOMP por região e fonte ({PAT}).",
             "opcoes.nivel: 'decomp' escala as usinas do caso de rede para somar o equivalente; 'capacidade' usa só"
             " capacidade × fator de capacidade histórico (útil quando a expansão do caso de rede vai além do DECOMP).",
+            "opcoes.capacidade: 'ons' usa a capacidade instalada do ONS (ou a estimada de vários dias de previsão)"
+            " quando a usina casou; 'caso' usa o cap_mw do caso de rede (no caso base, o máximo da previsão de um dia).",
         ),
     ),
     "termicas": Aba(
