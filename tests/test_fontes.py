@@ -29,8 +29,10 @@ def test_deck_decomp_mini():
     carga = {(r["estagio"], r["submercado"], r["patamar"]): r["mwmed"] for r in d.carga.to_pylist()}
     assert carga[(1, "SE", 1)] == 54209.0 and carga[(6, "N", 3)] == 8242.0
     assert ("1", "FC") not in carga  # FC (fictício) não tem carga
-    ct = [r for r in d.termicas.to_pylist() if r["estagio"] == 2]
+    # CT do estágio 2 vale até o próximo registro: o estágio 6 (só no DP) herda dele
+    ct = [r for r in d.termicas.to_pylist() if r["estagio"] == 6]
     assert {(r["inflex_mw"], r["disp_mw"], r["cvu"]) for r in ct} == {(213.0, 213.0, 31.17)}
+    assert {r["estagio"] for r in d.termicas.to_pylist()} == {1, 6}
     pq_ = d.pequenas.to_pylist()[0]
     assert (pq_["submercado"], pq_["fonte"], pq_["mmgd"], pq_["mwmed"]) == ("SE", "UFV", True, 1173.0)
     ande = {(r["estagio"], r["patamar"]): r["mwmed"] for r in d.ande.to_pylist()}

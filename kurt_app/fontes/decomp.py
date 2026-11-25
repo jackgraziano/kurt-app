@@ -15,6 +15,8 @@ O que sai de cada arquivo:
 - ``vazoes.rvN``: binário do GEVAZP. Traz as incrementais semanais previstas por posto
   (determinísticas) e os cenários de incrementais do mês seguinte, com probabilidade.
   O layout está em ``pulsar/docs/layout-VAZOES.RVx.md``.
+- Os registros CT, PQ e RI valem do estágio declarado até o próximo registro da mesma
+  entidade; as tabelas trazem uma linha por estágio, já propagada.
 - ``cortdeco.*`` e ``mapcut.*``: só existem quando o deck vem de uma rodada executada
   (a FCF própria do DECOMP). Este módulo só informa os caminhos.
 
@@ -466,6 +468,25 @@ ESQUEMAS = {
 }
 
 
+def _propagar(linhas: list[dict], chave: tuple[str, ...], estagios: list[int]) -> list[dict]:
+    """No dadger, um registro vale do seu estágio até o próximo registro da mesma entidade:
+    devolve uma linha por estágio (e patamar), repetindo o último valor declarado."""
+    por_ent: dict[tuple, dict[int, list[dict]]] = {}
+    for r in linhas:
+        por_ent.setdefault(tuple(r[k] for k in chave), {}).setdefault(r["estagio"], []).append(r)
+    out = []
+    validos = set(estagios)
+    for decl in por_ent.values():
+        atual: list[dict] | None = None
+        for e in sorted(validos | set(decl)):
+            if e in decl:
+                atual = decl[e]
+            if atual is None or e not in validos:
+                continue
+            out.extend({**r, "estagio": e} for r in atual)
+    return out
+
+
 def _tabela(nome: str, linhas: list[dict]) -> pa.Table:
     esq = ESQUEMAS[nome]
     return pa.Table.from_pylist(linhas, schema=esq) if linhas else esq.empty_table()
@@ -490,6 +511,7 @@ def ler_deck(origem: str | Path) -> DeckDecomp:
     carga, horas = _carga(linhas, subs)
     if not horas:
         raise DeckErro("dadger sem horas por patamar no registro DP")
+    ests = sorted(horas)
     renov = _renovaveis(arq.ler("renovaveis.csv"), subs)
     if not renov:
         avisos.append("sem renovaveis.csv: geração das usinas não despachadas ausente (decks antigos a trazem no PQ)")
@@ -518,9 +540,9 @@ def ler_deck(origem: str | Path) -> DeckDecomp:
         inicio=inicio,
         estagios=_tabela("estagios", _estagios(inicio, horas)),
         carga=_tabela("carga", carga),
-        termicas=_tabela("termicas", _termicas(linhas, subs)),
-        pequenas=_tabela("pequenas", _pequenas(linhas, subs)),
-        ande=_tabela("ande", _ande(linhas)),
+        termicas=_tabela("termicas", _propagar(_termicas(linhas, subs), ("codigo",), ests)),
+        pequenas=_tabela("pequenas", _propagar(_pequenas(linhas, subs), ("nome",), ests)),
+        ande=_tabela("ande", _propagar(_ande(linhas), (), ests)),
         renovaveis=_tabela("renovaveis", renov),
         volumes=_tabela("volumes", _volumes(linhas)),
         vazoes=_tabela("vazoes", sem),
