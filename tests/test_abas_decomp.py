@@ -236,3 +236,17 @@ def test_dia_antes_da_foto_do_caso_base(cli, tmp_path):
     assert data_rede(cad, "2026-01-05") == cad.data_base()
     assert data_rede(cad, "2026-12-05") == "2026-12-05"
     assert cad.renovaveis(data_rede(cad, "2026-01-05"))
+
+
+def test_correcao_de_nivel_historica(cli, monkeypatch):
+    sims = cli.app.state.simulacoes
+    x = niveis.semanas(sims.ler("s1"))[0]
+    f = niveis.formas()
+    monkeypatch.setattr(f, "vies", lambda fonte, sub, mes, pat: 1.5 if fonte == "EOL" else 1.0, raising=False)
+    monkeypatch.setattr(series, "FAIXA_FATOR", (0.0, 1e9))
+    antes = dia.semana(sims, sims.ler("s1"), x)["fator_renovaveis"]["NE|EOL"]
+    doc = cli.get("/api/simulacoes/s1/insumos/renovaveis").json()
+    doc["dados"]["opcoes"]["correcao_nivel"] = "historica"
+    assert cli.post("/api/simulacoes/s1/insumos/renovaveis", json=doc).status_code == 200
+    depois = dia.semana(sims, sims.ler("s1"), x)["fator_renovaveis"]["NE|EOL"]
+    assert depois == pytest.approx(1.5 * antes)

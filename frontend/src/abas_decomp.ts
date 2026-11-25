@@ -14,7 +14,17 @@ type Campo =
   | { nome: string; rotulo: string; tipo: "sim" };
 
 const CAMPOS: Record<string, Campo[]> = {
-  carga: [],
+  carga: [
+    {
+      nome: "correcao_nivel",
+      rotulo: "Correção do nível do DECOMP",
+      tipo: "escolha",
+      opcoes: [
+        ["nenhuma", "nenhuma (DECOMP como está)"],
+        ["historica", "razão histórica previsão DESSEM / DECOMP"],
+      ],
+    },
+  ],
   renovaveis: [
     {
       nome: "nivel",
@@ -32,6 +42,15 @@ const CAMPOS: Record<string, Campo[]> = {
       opcoes: [
         ["ons", "instalada do ONS (ou estimada de vários dias)"],
         ["caso", "cap_mw do caso de rede"],
+      ],
+    },
+    {
+      nome: "correcao_nivel",
+      rotulo: "Correção do nível do DECOMP",
+      tipo: "escolha",
+      opcoes: [
+        ["nenhuma", "nenhuma (DECOMP como está)"],
+        ["historica", "razão histórica previsão DESSEM / DECOMP"],
       ],
     },
   ],

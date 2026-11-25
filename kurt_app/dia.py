@@ -54,6 +54,11 @@ def semana(sims: Simulacoes, s: dict, x: dict, cenario: int = 0) -> dict:
     except FileNotFoundError as e:
         raise SimulacaoErro(f"formas históricas ausentes ({e})") from None
     usinas = capacidades(f, usinas, op_ren["capacidade"])
+    mes = int(x["mes"][5:7]) if x.get("mes") else date.fromisoformat(x["inicio"]).month
+    if op_ren["correcao_nivel"] == "historica":
+        renov = corrigir_nivel(f, renov, mes)
+    if op_carga["correcao_nivel"] == "historica":
+        mmgd = corrigir_nivel(f, mmgd, mes, fonte_fixa="MMGD")
     sem = series.semana(
         f,
         x,
@@ -67,6 +72,24 @@ def semana(sims: Simulacoes, s: dict, x: dict, cenario: int = 0) -> dict:
     )
     sem["usinas"] = {u["usina_id"]: u for u in usinas}
     return sem
+
+
+def corrigir_nivel(f, linhas: list[dict], mes: int, fonte_fixa: str | None = None) -> list[dict]:
+    """Multiplica o MWmed do DECOMP pela razão histórica previsão DESSEM / DECOMP (Formas.vies).
+
+    Sem a tabela de viés (``vies_renovaveis.parquet``), nada muda.
+    """
+    vies = getattr(f, "vies", None)
+    if vies is None:
+        return linhas
+    out = []
+    for r in linhas:
+        try:
+            k = vies(fonte_fixa or r["fonte"], r["submercado"], mes, r["patamar"])
+        except (KeyError, FileNotFoundError):
+            k = 1.0
+        out.append(dict(r, mwmed=(r["mwmed"] or 0.0) * (k or 1.0)))
+    return out
 
 
 def data_rede(cad, data: str) -> str:

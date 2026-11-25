@@ -109,13 +109,17 @@ def _op_carga(op: dict, _s: dict) -> dict:
     for k, v in ajuste.items():
         if k not in ("SE", "S", "NE", "N") or _numero(v, f"ajuste {k}") <= 0:
             raise SimulacaoErro(f"opção ajuste: {k}={v!r} inválido (submercados SE, S, NE, N; fator > 0)")
-    return {"ajuste": {k: float(v) for k, v in ajuste.items()}}
+    return {
+        "ajuste": {k: float(v) for k, v in ajuste.items()},
+        "correcao_nivel": _escolha(op, "correcao_nivel", ("nenhuma", "historica"), "nenhuma"),
+    }
 
 
 def _op_renovaveis(op: dict, _s: dict) -> dict:
     return {
         "nivel": _escolha(op, "nivel", ("decomp", "capacidade"), "decomp"),
         "capacidade": _escolha(op, "capacidade", ("ons", "caso"), "ons"),
+        "correcao_nivel": _escolha(op, "correcao_nivel", ("nenhuma", "historica"), "nenhuma"),
     }
 
 
@@ -237,6 +241,8 @@ ABAS: dict[str, Aba] = {
             " capacidade × fator de capacidade histórico (útil quando a expansão do caso de rede vai além do DECOMP).",
             "opcoes.capacidade: 'ons' usa a capacidade instalada do ONS (ou a estimada de vários dias de previsão)"
             " quando a usina casou; 'caso' usa o cap_mw do caso de rede (no caso base, o máximo da previsão de um dia).",
+            "opcoes.correcao_nivel: 'historica' multiplica os equivalentes do DECOMP pela razão histórica entre a"
+            " previsão do DESSEM e o DECOMP (por fonte, submercado, mês e patamar); 'nenhuma' usa o DECOMP.",
         ),
     ),
     "termicas": Aba(
