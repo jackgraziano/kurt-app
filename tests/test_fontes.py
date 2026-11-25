@@ -224,3 +224,44 @@ def test_formas_capacidade(tmp_path):
     assert f.capacidade("EOL-1") == (50.0, "ons")
     assert f.capacidade("EOL-2") == (30.0, "decks_dessem")
     assert f.capacidade("EOL-3") is None and f.capacidade("EOL-9") is None
+
+
+def test_formas_vies(tmp_path):
+    f = Formas(tmp_path)
+    with pytest.raises(FileNotFoundError):
+        f.vies("EOL", "NE", 11, 2)
+    pq.write_table(
+        pa.Table.from_pylist(
+            [
+                {"fonte": "EOL", "submercado": "NE", "mes": 11, "patamar": 2, "razao": 0.9, "n_semanas": 8},
+                {"fonte": "MMGD", "submercado": "SE", "mes": 11, "patamar": 0, "razao": 1.2, "n_semanas": 8},
+            ]
+        ),
+        tmp_path / "vies_renovaveis.parquet",
+    )
+    f = Formas(tmp_path)
+    assert f.vies("EOL", "NE", 11, 2) == pytest.approx(0.9)
+    assert f.vies("MMGD", "SE", 11, 0) == pytest.approx(1.2)
+    with pytest.raises(KeyError):
+        f.vies("UFV", "NE", 11, 2)
+
+
+def test_renovaveis_leiaute_por_cenario():
+    from kurt_app.fontes.decomp import _renovaveis
+
+    csv_ = "\n".join(
+        [
+            " PEE-CAD;        3;Eolica NE",
+            " PEE-CAD;        13;Fotovoltaica NE",
+            " PEE-SUBM;3;3",
+            " PEE-SUBM;13;3",
+            "PEE-GER-PER-PAT-CEN;3;1;1;1;1;100",
+            "PEE-GER-PER-PAT-CEN;3;2;2;1;1;80",
+            "PEE-GER-PER-PAT-CEN;3;2;2;1;2;120",
+            "PEE-GER-PER-PAT-CEN;13;1;1;2;1;50",
+        ]
+    ).encode("latin-1")
+    r = {(x["fonte"], x["estagio"], x["patamar"]): x for x in _renovaveis(csv_, {3: "NE"})}
+    assert r[("EOL", 1, 1)]["mwmed"] == pytest.approx(100)
+    assert r[("EOL", 2, 1)]["mwmed"] == pytest.approx(100)  # média dos cenários
+    assert r[("UFV", 1, 2)]["submercado"] == "NE"

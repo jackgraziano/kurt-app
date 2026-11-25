@@ -29,6 +29,7 @@ import json
 import math
 import re
 import zipfile
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 from pathlib import Path
@@ -300,6 +301,7 @@ def _renovaveis(b: bytes | None, subs: dict[int, str]) -> list[dict]:
     if not b:
         return []
     nome, sub, pot, ger = {}, {}, {}, []
+    cen: dict[tuple[int, int, int], list[float]] = defaultdict(list)
     for ln in _linhas(b):
         if not ln or ln.startswith("&"):
             continue
@@ -316,12 +318,22 @@ def _renovaveis(b: bytes | None, subs: dict[int, str]) -> list[dict]:
             elif k == "PEE-GER-PER-PAT":
                 for e in range(int(c[2]), int(c[3]) + 1):
                     ger.append((int(c[1]), e, int(c[4]), float(c[5])))
+            elif k == "PEE-GER-PER-PAT-CEN":
+                # leiaute até 10/2026: um valor por cenário (ID;CodPEE;EstIni;EstFim;Pat;Cen;Ger); fica a média
+                for e in range(int(c[2]), int(c[3]) + 1):
+                    cen[(int(c[1]), e, int(c[4]))].append(float(c[6]))
         except (IndexError, ValueError):
             continue
+    ger += [(i, e, p, sum(v) / len(v)) for (i, e, p), v in cen.items()]
     out = []
     for i, e, p, mw in ger:
         n = nome.get(i, str(i))
         suf = n.rsplit("_", 1)[-1]
+        # leiaute até 10/2026: "Eolica SECO", "Fotovoltaica NE" (um equivalente por fonte e submercado)
+        if n.lower().startswith("eolica"):
+            suf = "EOL"
+        elif n.lower().startswith("fotovoltaica"):
+            suf = "UFV"
         cap = pot.get((i, e))
         out.append(
             {

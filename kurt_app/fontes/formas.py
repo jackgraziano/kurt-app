@@ -128,12 +128,27 @@ class Formas:
         return out
 
     def perfil_carga(self, submercado: str, mes: int, tipo: str) -> np.ndarray:
-        """48 fatores (meia hora 0 = 00:00-00:30) da carga sem MMGD."""
+        """48 fatores (meia hora 0 = 00:00-00:30) da carga global com MMGD."""
         return self._vetor("carga", {"submercado": submercado, "mes": mes, "tipo_dia": tipo}, "meia_hora", "fator", 48)
 
     def perfil_mmgd(self, submercado: str, mes: int, fonte: str = "UFV") -> np.ndarray:
         """48 fatores com média 1 no dia típico do mês."""
         return self._vetor("mmgd", {"submercado": submercado, "fonte": fonte, "mes": mes}, "meia_hora", "fc", 48)
+
+    def vies(self, fonte: str, submercado: str, mes: int, patamar: int) -> float:
+        """Razão histórica previsão do DESSEM / nível do DECOMP (``vies_renovaveis.parquet``).
+
+        `fonte` é EOL, UFV ou MMGD; `patamar` 1 a 3 (0 = dia inteiro). KeyError se não houver a linha;
+        FileNotFoundError se a tabela não existir (rode scripts/vies_decomp_dessem.py)."""
+        t = self.tabela("vies_renovaveis")
+        m = pc.and_(
+            pc.and_(pc.equal(t["fonte"], fonte), pc.equal(t["submercado"], submercado)),
+            pc.and_(pc.equal(t["mes"], int(mes)), pc.equal(t["patamar"], int(patamar))),
+        )
+        sel = t.filter(m)
+        if sel.num_rows == 0:
+            raise KeyError(f"vies_renovaveis: sem razão para {fonte} {submercado} mês {mes} patamar {patamar}")
+        return float(sel["razao"][0].as_py())
 
     def perfil_fc(
         self, mes: int, usina_id: str | None = None, fonte: str | None = None, uf: str | None = None
